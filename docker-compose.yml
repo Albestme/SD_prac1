@@ -18,37 +18,44 @@ services:
     networks:
       - distributed-network
 
-  InsultService:
-    build: ./InsultService.dockerfile
-    container_name: InsultService_prac1
-    image: insultservice
-    environment:
-      - NODE_NAME=InsultService
-      - REDIS_HOST=redis
-      - RABBIT_HOST=rabbitmq
-    ports:
-      - "5000:5000"
-    depends_on:
-      - rabbitmq
-      - redis
-    networks:
-      - distributed-network
-
-  client:
-    build: .
-    container_name: client_prac1
-    image: client
-    environment:
-      - NODE_NAME=client
-      - REDIS_HOST=redis
-      - RABBIT_HOST=rabbitmq
-    ports:
-      - "5001:5001"
-    depends_on:
-      - rabbitmq
-      - redis
-    networks:
-      - distributed-network
-
-networks:
-  distributed-network:
+# InsultService:
+#   build:
+#     context: dockerfiles
+#     dockerfile: InsultService.dockerfile
+#   container_name: InsultService_prac1
+#   image: insultservice
+#   environment:
+#     - NODE_NAME=InsultService
+#     - REDIS_HOST=redis
+#     - RABBIT_HOST=rabbitmq
+#   ports:
+#     - "5000:5000"
+#   depends_on:
+#     - rabbitmq
+#     - redis
+#   networks:
+#     - distributed-network
+#
+# client:
+#   build:
+#       context: dockerfiles
+#       dockerfile: client.dockerfile
+#   container_name: client_prac1
+#   image: client
+#   environment:
+#     - NODE_NAME=client
+#     - REDIS_HOST=redis
+#     - RABBIT_HOST=rabbitmq
+#   ports:
+#     - "5001:5001"
+#   depends_on:
+#     - rabbitmq
+#     - redis
+#   networks:
+#     - distributed-network
+#   stdin_open: true
+#   tty: true
+#   command: [ "tail", "-f", "/dev/null" ]  # Keeps the container running
+#
+# networks:
+#   distributed-network:
