@@ -4,7 +4,7 @@ from time import sleep
 # Connect to Redis
 client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
 
-queue_name = "task_queue"
+queue_name = "insults"
 
 # Send multiple messages
 tasks = ["Task 1", "Task 2", "Task 3"]
