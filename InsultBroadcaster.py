@@ -1,13 +1,14 @@
 import redis
 from time import sleep
+import pika
 
 # Connect to Redis
 client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
 
 queue_name = "insults"
 
-# Send multiple messages
-tasks = ["Task 1", "Task 2", "Task 3"]
+# Send multiple insults
+tasks = ["tonto", "comemierda", "subnormal", "imbécil"]
 
 for task in tasks:
     client.rpush(queue_name, task)
