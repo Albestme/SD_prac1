@@ -7,16 +7,12 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
-    networks:
-      - distributed-network
 
   redis:
     image: redis:latest
     container_name: redis_prac1
     ports:
       - "6379:6379"
-    networks:
-      - distributed-network
 
 # InsultService:
 #   build:
