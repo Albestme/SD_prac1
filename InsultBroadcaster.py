@@ -2,15 +2,23 @@ import redis
 from time import sleep
 import pika
 
-# Connect to Redis
-client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+def broadcast():
+    # Connect to Redis
+    client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
 
-queue_name = "insults"
+    # Connect to RabbitMQ
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    channel = connection.channel()
 
-# Send multiple insults
-tasks = ["tonto", "comemierda", "subnormal", "imbécil"]
+    queue_name = "insults"
 
-for task in tasks:
-    client.rpush(queue_name, task)
-    print(f"Produced: {task}")
-    sleep(1)  # Simulating a delay in task production
+    # Send multiple insults
+    tasks = ["tonto", "comemierda", "subnormal", "imbécil"]
+
+    for task in tasks:
+        client.rpush(queue_name, task)
+        print(f"Produced: {task}")
+        sleep(1)  # Simulating a delay in task production
+
+if __name__ == '__main__':
+    broadcast()
