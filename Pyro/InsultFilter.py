@@ -30,7 +30,7 @@ class FilterService:
             self.connect_to_insult_service()
 
         filtered = text
-        insults = self.insult_service.list_insults()
+        insults = self.insult_service.get_insults()
         for insult in insults:
             filtered = filtered.replace(insult, "CENSORED")
         return filtered

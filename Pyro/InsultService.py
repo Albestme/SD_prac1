@@ -1,14 +1,23 @@
 import Pyro4
+import random
+import threading
+from time import sleep
+from Subscriber import InsultSubscriber
 
 
 Pyro4.config.REQUIRE_EXPOSE = True
 
-# python -m Pyro4.naming
-# Make the server object remotely accessible
 @Pyro4.expose
+@Pyro4.behavior(instance_mode="single")
 class InsultService:
-    insults = list()
-    subscribers = list()
+    def __init__(self):
+        self.insults = []
+        self.subscribers = []
+
+        # Start automatic broadcast thread
+        self.broadcast_thread = threading.Thread(target=self._broadcast_random_insult)
+        self.broadcast_thread.daemon = True
+        self.broadcast_thread.start()
 
     def add_insult(self, insult):
         if insult in self.insults:
@@ -20,25 +29,40 @@ class InsultService:
     def get_insults(self):
         return self.insults
 
-    def register_suscriber(self, subscriber):
-        if not hasattr(subscriber, 'receive_insult'):
-            raise ValueError("Subscriber must have a 'notify' method")
-
+    def register_subscriber(self, subscriber_uri):
+        """Register a subscriber to receive insults"""
+        subscriber = InsultSubscriber(subscriber_uri)
         self.subscribers.append(subscriber)
-        return "Subscriber registered successfully"
+        print(f"Observer {subscriber_uri} registered")
 
-    def notify_subscribers(self, message):
+    def notify_subscribers(self, insult):
+        """Notify all registered subscribers with the given Insult"""
         for subscriber in self.subscribers:
             try:
-                subscriber.receive_insult(message)
+                subscriber.receive_insult(insult)
             except Exception as e:
                 print(f"Failed to notify subscriber: {e}")
+                print(f"Removing subscriber {subscriber._pyroUri} from the list")
+                self.subscribers.remove(subscriber)
 
+    def unregister_observer(self, observer_uri):
+        """Unregister an observer."""
+        self.subscribers = [obs for obs in self.subscribers if obs._pyroUri != observer_uri]
+        print(f"Observer {observer_uri} unregistered.")
+
+    def _broadcast_random_insult(self):
+        """Periodically broadcast random insults"""
+        while True:
+            sleep(5)  # Every 5 seconds
+            if self.insults and self.subscribers:
+                insult = random.choice(self.insults)
+                print(f"Broadcasting insult: {insult}")
+                self.notify_subscribers(insult)
 
 if __name__ == "__main__":
     daemon = Pyro4.Daemon()  # Create Pyro daemon
     ns = Pyro4.locateNS()  # Locate name server
-    uri = daemon.register(InsultService)  # Register EchoServer
+    uri = daemon.register(InsultService())  # Register InsultService instance
     ns.register("insult.service", uri)  # Register with a unique name
 
     print("Insult server running...")
