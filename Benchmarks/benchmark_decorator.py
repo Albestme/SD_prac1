@@ -2,11 +2,13 @@ import time
 import multiprocessing
 import random
 from XMLRPC.insult_service import InsultService as Xmlrpc_Insult_Service
-from Redis.insult_service import InsultService as Redis_Insult_Service
-from RabbitMQ_Redis.insult_service import InsultService as RabbitMQ_Insult_Service
-from Pyro.InsultService import InsultService as Pyro_Insult_Service
-import matplotlib.pyplot as plt
 import csv
+
+
+def write_csv(mode, architecture, num_clients, iterations_per_client, elapsed_time):
+    with open(f'{mode}.csv', mode='a', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow([architecture, num_clients, iterations_per_client, elapsed_time])
 
 
 class BenchmarkDecorator:
@@ -16,7 +18,7 @@ class BenchmarkDecorator:
 
 
 class InsultServiceDecorator(BenchmarkDecorator):
-    def __init__(self, service, num_services=1):
+    def __init__(self, service):
         super().__init__()
         self.insult_service = service
         self.insults = ['dumb',
@@ -33,20 +35,22 @@ class InsultServiceDecorator(BenchmarkDecorator):
         for _ in range(0, iterations):
             self.insult_service.add_insult(random.choice(self.insults))
 
-    def stress_insult_service(self, architecture, num_clients=3, iterations_per_client=2500000):
+    def stress_insult_service(self, mode, architecture, num_clients=3, iterations_per_client=2500000):
         self.start_time = time.time()
 
-        self.create_clients()
+        self.create_clients(num_clients, iterations_per_client)
         self.end_time = time.time()
         total_time = self.end_time - self.start_time
+
+        write_csv(mode, architecture, num_clients, iterations_per_client, total_time)
 
         print(f'Elapsed time: {total_time} seconds')
         return total_time
 
-    def create_clients(self):
+    def create_clients(self, num_clients, iterations_per_client):
         processes = []
-        for i in range(3):
-            processes.append(multiprocessing.Process(target=self.stressfull_client, args=(2500000, )))
+        for i in range(num_clients):
+            processes.append(multiprocessing.Process(target=self.stressfull_client, args=(iterations_per_client, )))
             processes[i].start()
 
         for process in processes:
@@ -54,7 +58,7 @@ class InsultServiceDecorator(BenchmarkDecorator):
 
 
 if __name__ == "__main__":
-    InsultServiceDecorator(Xmlrpc_Insult_Service()).stress_insult_service()
+    InsultServiceDecorator(Xmlrpc_Insult_Service()).stress_insult_service('single_node', 'XMLRPC', num_clients=10, iterations_per_client=10000000)
 
 
 
