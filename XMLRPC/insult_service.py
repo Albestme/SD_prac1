@@ -7,17 +7,13 @@ import xmlrpc.client
 
 class InsultService:
     def __init__(self):
-        # Store insults in a set to avoid duplicates
         self.insults = set()
-        # List of subscriber URLs
         self.subscribers = []
-        # Start broadcaster thread
         threading.Thread(target=self._broadcast_insults, daemon=True).start()
 
     def add_insult(self, insult):
         """Add an insult if not already in the list"""
         self.insults.add(insult)
-        return True
 
     def list_insults(self):
         """Return all stored insults"""

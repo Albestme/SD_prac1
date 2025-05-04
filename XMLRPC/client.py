@@ -1,7 +1,7 @@
 import random
 import xmlrpc.client
 from time import sleep
-from XMLRPC.Subscriber import InsultSubscriber
+from XMLRPC.subscriber import InsultSubscriber
 
 if __name__ == '__main__':
     insult_service= xmlrpc.client.ServerProxy('http://localhost:8000')
