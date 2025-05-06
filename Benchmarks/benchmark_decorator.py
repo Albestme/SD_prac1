@@ -12,14 +12,16 @@ def write_csv(mode, architecture, num_clients, iterations_per_client, elapsed_ti
 
 
 class BenchmarkDecorator:
-    def __init__(self):
+    def __init__(self, architecture, mode):
         self.start_time = None
         self.end_time = None
+        self.architecture = architecture    # XMLRPC, Redis, RabbitMQ_Redis, Pyro
+        self.mode = mode                    # single_node, multi_node_static, multi_node_dynamic
 
 
 class InsultServiceDecorator(BenchmarkDecorator):
-    def __init__(self, service):
-        super().__init__()
+    def __init__(self, service, architecture, mode):
+        super().__init__(architecture, mode)
         self.insult_service = service
         self.insults = ['dumb',
                         'moron',
@@ -35,14 +37,14 @@ class InsultServiceDecorator(BenchmarkDecorator):
         for _ in range(0, iterations):
             self.insult_service.add_insult(random.choice(self.insults))
 
-    def stress_insult_service(self, mode, architecture, num_clients=3, iterations_per_client=2500000):
+    def stress_insult_service(self, num_clients=3, iterations_per_client=2500000):
         self.start_time = time.time()
 
         self.create_clients(num_clients, iterations_per_client)
         self.end_time = time.time()
         total_time = self.end_time - self.start_time
 
-        write_csv(mode, architecture, num_clients, iterations_per_client, total_time)
+        write_csv(self.mode, self.architecture, num_clients, iterations_per_client, total_time)
 
         print(f'Elapsed time: {total_time} seconds')
         return total_time
@@ -58,7 +60,8 @@ class InsultServiceDecorator(BenchmarkDecorator):
 
 
 if __name__ == "__main__":
-    InsultServiceDecorator(Xmlrpc_Insult_Service()).stress_insult_service('single_node', 'XMLRPC', num_clients=10, iterations_per_client=10000000)
+    (InsultServiceDecorator(Xmlrpc_Insult_Service(), 'XMLRPC', 'single_node' ).
+     stress_insult_service(num_clients=10, iterations_per_client=10000000))
 
 
 
