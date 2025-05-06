@@ -3,7 +3,8 @@ import redis
 import random
 import threading
 from time import sleep
-from subscriber import start_subscriber
+from RabbitMQ_Redis.subscriber import start_subscriber
+
 
 class InsultService:
     def __init__(self):

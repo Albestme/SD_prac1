@@ -2,7 +2,7 @@ import redis
 import random
 from time import sleep
 import threading
-from subscriber import start_subscriber
+from Redis.subscriber import start_subscriber
 
 
 class InsultService:

@@ -2,7 +2,7 @@ import Pyro4
 import random
 import threading
 from time import sleep
-from Subscriber import InsultSubscriber
+from Pyro.Subscriber import InsultSubscriber
 
 
 Pyro4.config.REQUIRE_EXPOSE = True

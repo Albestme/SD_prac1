@@ -1,6 +1,5 @@
 import random
 import xmlrpc.client
-from time import sleep
 from XMLRPC.subscriber import InsultSubscriber
 
 if __name__ == '__main__':
