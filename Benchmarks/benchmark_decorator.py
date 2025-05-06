@@ -4,7 +4,7 @@ import random
 from XMLRPC.insult_service import InsultService as Xmlrpc_Insult_Service
 from XMLRPC.insult_filter import InsultFilter as Xmlrpc_Filter_Service
 import csv
-
+from abc import ABC, abstractmethod
 
 def write_csv(mode, architecture, num_clients, iterations_per_client, elapsed_time):
     with open(f'{mode}.csv', mode='a', newline='') as file:
@@ -12,7 +12,7 @@ def write_csv(mode, architecture, num_clients, iterations_per_client, elapsed_ti
         writer.writerow([architecture, num_clients, iterations_per_client, elapsed_time])
 
 
-class BenchmarkDecorator:
+class BenchmarkDecorator(ABC):
     def __init__(self, architecture, mode):
         self.start_time = None
         self.end_time = None
@@ -27,6 +27,10 @@ class BenchmarkDecorator:
 
         for process in processes:
             process.join()
+
+    @abstractmethod
+    def stressfull_client(self, iterations):
+        pass
 
 
 class InsultServiceDecorator(BenchmarkDecorator):
