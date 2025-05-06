@@ -8,7 +8,8 @@ from Redis.insult_service import InsultService as Redis_Insult_Service
 from Redis.insult_filter import InsultFilter as Redis_Filter_Service
 from RabbitMQ_Redis.insult_service import InsultService as RabbitMQ_Insult_Service
 from RabbitMQ_Redis.insult_filter import InsultFilter as RabbitMQ_Filter_Service
-from Pyro.InsultService import InsultService as Pyro_Insult_Service
+from Pyro.insult_service import InsultService as Pyro_Insult_Service
+from Pyro.insult_filter import FilterService as Pyro_Filter_Service
 
 
 def benchmark_single(module_names, clients, iterations):
@@ -21,18 +22,17 @@ def benchmark_single(module_names, clients, iterations):
         elif module_name == 'Pyro':
             (InsultServiceDecorator(Pyro_Insult_Service(), 'Pyro', 'single_node')
             .stress_insult_service(num_clients=clients, iterations_per_client=iterations))
-            (FilterServiceDecorator(Pyro_Insult_Service(), 'Pyro', 'single_node')
+            (FilterServiceDecorator(Pyro_Filter_Service(), 'Pyro', 'single_node')
             .stress_filter_service(num_clients=clients, iterations_per_client=iterations))
         elif module_name == 'Redis':
-            client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
             (InsultServiceDecorator(Redis_Insult_Service(), 'Redis', 'single_node')
             .stress_insult_service(num_clients=clients, iterations_per_client=iterations))
-            (FilterServiceDecorator(Redis_Insult_Service(), 'Redis', 'single_node')
+            (FilterServiceDecorator(Redis_Filter_Service(), 'Redis', 'single_node')
             .stress_filter_service(num_clients=clients, iterations_per_client=iterations))
         elif module_name == 'RabbitMQ_Redis':
             (InsultServiceDecorator(RabbitMQ_Insult_Service(), 'RabbitMQ_Redis', 'single_node')
             .stress_insult_service(num_clients=clients, iterations_per_client=iterations))
-            (FilterServiceDecorator(RabbitMQ_Insult_Service(), 'RabbitMQ_Redis', 'single_node')
+            (FilterServiceDecorator(RabbitMQ_Filter_Service(), 'RabbitMQ_Redis', 'single_node')
             .stress_filter_service(num_clients=clients, iterations_per_client=iterations))
 
 
