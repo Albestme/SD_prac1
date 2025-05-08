@@ -2,7 +2,7 @@ import Pyro4
 from time import sleep
 import random
 from threading import Thread
-from Subscriber import register_subscriber
+from subscriber import register_subscriber
 
 
 if __name__ == "__main__":

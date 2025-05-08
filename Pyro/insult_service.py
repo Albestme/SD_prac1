@@ -2,7 +2,6 @@ import Pyro4
 import random
 import threading
 from time import sleep
-from Pyro.Subscriber import InsultSubscriber
 
 
 Pyro4.config.REQUIRE_EXPOSE = True
@@ -58,6 +57,15 @@ class InsultService:
                 insult = random.choice(self.insults)
                 print(f"Broadcasting insult: {insult}")
                 self.notify_subscribers(insult)
+
+@Pyro4.expose
+class InsultSubscriber:
+    def __init__(self, subscriber_id):
+        self.subscriber_id = subscriber_id
+
+    def receive_insult(self, insult):
+        """Callback method called by the insult service"""
+        print(f"Subscriber {self.subscriber_id} received insult: {insult}")
 
 if __name__ == "__main__":
     daemon = Pyro4.Daemon()  # Create Pyro daemon
