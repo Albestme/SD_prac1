@@ -6,10 +6,10 @@ from XMLRPC.insult_filter import InsultFilter as Xmlrpc_Filter_Service
 import csv
 from abc import ABC, abstractmethod
 
-def write_csv(mode, architecture, num_clients, iterations_per_client, elapsed_time):
+def write_csv(mode, architecture, num_clients, iterations_per_client, elapsed_time, insult_service):
     with open(f'{mode}.csv', mode='a', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow([architecture, num_clients, iterations_per_client, elapsed_time])
+        writer.writerow([insult_service, architecture, num_clients, iterations_per_client, elapsed_time])
 
 
 class BenchmarkDecorator(ABC):
@@ -58,7 +58,7 @@ class InsultServiceDecorator(BenchmarkDecorator):
         self.end_time = time.time()
         total_time = self.end_time - self.start_time
 
-        write_csv(self.mode, self.architecture, num_clients, iterations_per_client, total_time)
+        write_csv(self.mode, self.architecture, num_clients, iterations_per_client, total_time, 'insult_service')
 
         print(f'Elapsed time: {total_time} seconds')
         return total_time
@@ -89,7 +89,7 @@ class FilterServiceDecorator(BenchmarkDecorator):
         self.end_time = time.time()
         total_time = self.end_time - self.start_time
 
-        write_csv(self.mode, self.architecture, num_clients, iterations_per_client, total_time)
+        write_csv(self.mode, self.architecture, num_clients, iterations_per_client, total_time, 'filter_service')
 
         print(f'Elapsed time: {total_time} seconds')
         return total_time
