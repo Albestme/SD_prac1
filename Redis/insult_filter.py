@@ -1,13 +1,13 @@
 import redis
-import threading
+import multiprocessing
 
 class InsultFilter:
     def __init__(self):
         self.client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
         self.work_queue = 'text_work_queue'
-        self.filtered_texts = []
+        self.filtered_queue = 'text_filtered_queue'
 
-        threading.Thread(target=self._process_queue, daemon=True).start()
+        multiprocessing.Process(target=self._process_queue, daemon=True).start()
 
     def filter_text(self, text):
         """Replace insults in text with CENSORED"""
@@ -20,11 +20,11 @@ class InsultFilter:
     def append_text_filtering_work_queue(self, text):
         """Append text to the work queue for filtering"""
         self.client.rpush(self.work_queue, text)
-        print(f"Text appended to work queue: {text}")
+        return f"Text appended to work queue: {text}"
 
     def list_filtered_results(self):
         """List all filtered results"""
-        return self.filtered_texts
+        return self.client.lrange(self.filtered_queue, 0, -1)
 
     def _process_queue(self):
         """Worker that processes the queue in background"""
@@ -34,6 +34,6 @@ class InsultFilter:
             if text:
                 original_text = text[1]
                 filtered = self.filter_text(original_text)
-                self.filtered_texts.append(filtered)
+                self.client.rpush(self.filtered_queue, filtered)
                 print(f"Filtered: '{original_text}' → '{filtered}'")
 

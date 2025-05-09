@@ -22,10 +22,10 @@ class InsultService:
         """Add a new insult to the list """
         insults = self.get_insults()
         if insult in insults:
-            print("Insult already in redis list")
+            return "Insult already in redis list"
         else:
             self.client.rpush(self.insult_channel, insult)
-            print(f"Insult added to redis list: {insult}")
+            return f"Insult added to redis list: {insult}"
 
     def register_subscriber(self, subscriber_id):
         """Start a new subscriber"""

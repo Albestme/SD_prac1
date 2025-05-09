@@ -14,7 +14,7 @@ if __name__ == "__main__":
     insults = ["idiot", "fool", "moron", "dummy", "blockhead", "nincompoop", "dimwit", "dunce", "nitwit", "bonehead"]
 
     for insult in insults:
-        insult_service.add_insult(insult)
+        print(insult_service.add_insult(insult))
 
     print(insult_service.get_insults())
 
@@ -30,7 +30,7 @@ if __name__ == "__main__":
     ]
 
     for i in range(10):
-        filter_service.append_text_filtering_work_queue(random.choice(texts))
+        print(filter_service.append_text_filtering_work_queue(random.choice(texts)))
 
     print(insult_service.get_insults())
     sleep(6)
