@@ -1,7 +1,7 @@
 import pika
 import redis
 import random
-import threading
+import multiprocessing
 from time import sleep
 from RabbitMQ_Redis.subscriber import start_subscriber
 
@@ -16,7 +16,6 @@ class InsultService:
         self.channel.exchange_declare(exchange='broadcast channel', exchange_type='fanout')
 
         self.subscribers = []
-        self.insults = []
         print("InsultService waiting for insults...")
 
         # Start a redis queue to store insults
@@ -24,7 +23,7 @@ class InsultService:
         self.insult_channel = "insult_list"
 
         # Start broadcasting thread
-        threading.Thread(target=self._broadcast_random_insult, daemon=True).start()
+        multiprocessing.Process(target=self._broadcast_random_insult, daemon=True).start()
 
 
     def get_insults(self):
@@ -34,14 +33,14 @@ class InsultService:
         """Add a new insult to the list"""
         insults = self.get_insults()
         if insult in insults:
-            print("Insult already in redis list")
+            return "Insult already in redis list"
         else:
             self.redis.rpush(self.insult_channel, insult)
-            print(f"Insult added to redis list: {insult}")
+            return f"Insult added to redis list: {insult}"
 
     def register_subscriber(self, subscriber_id):
         """Start a new subscriber"""
-        threading.Thread(target=start_subscriber, args=(subscriber_id,)).start()
+        multiprocessing.Process(target=start_subscriber, args=(subscriber_id,)).start()
         self.subscribers.append(subscriber_id)
         print(f"Subscriber {subscriber_id} registered.")
 
