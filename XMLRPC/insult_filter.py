@@ -2,12 +2,13 @@ import xmlrpc.client
 import threading
 from time import sleep
 from xmlrpc.server import SimpleXMLRPCServer
+import sys
 
 
 class InsultFilter:
-    def __init__(self):
+    def __init__(self, insult_service=xmlrpc.client.ServerProxy("http://localhost:8000")):
         # Connection to the InsultService
-        self.insult_service = xmlrpc.client.ServerProxy("http://localhost:8000")
+        self.insult_service = insult_service
 
         # Storage for filtered texts
         self._filter_queue = []
@@ -48,9 +49,9 @@ class InsultFilter:
 if __name__ == "__main__":
     # Create the filter service
     filter_service = InsultFilter()
-
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
     # Create and start XML-RPC server
-    server = SimpleXMLRPCServer(("localhost", 8001), allow_none=True)
+    server = SimpleXMLRPCServer(("localhost", port), allow_none=True)
     server.register_instance(filter_service)
     print("InsultFilter service running on port 8001...")
 

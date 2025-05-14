@@ -3,6 +3,7 @@ import threading
 from time import sleep
 import random
 import xmlrpc.client
+import sys
 
 
 class InsultService:
@@ -53,7 +54,8 @@ class InsultService:
 
 if __name__ == "__main__":
     # Create and start XML-RPC server
-    server = SimpleXMLRPCServer(("localhost", 8000), allow_none=True)
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
+    server = SimpleXMLRPCServer(("localhost", port), allow_none=True)
     server.register_instance(InsultService())
-    print("InsultService running on port 8000...")
+    print(f"InsultService running on port {port}...")
     server.serve_forever()
