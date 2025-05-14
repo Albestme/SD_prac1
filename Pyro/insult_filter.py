@@ -1,6 +1,7 @@
 import Pyro4
 import threading
 from time import sleep
+import sys
 
 Pyro4.config.REQUIRE_EXPOSE = True
 
@@ -57,6 +58,7 @@ class FilterService:
 
 
 if __name__ == "__main__":
+    service_number = int(sys.argv[1]) if len(sys.argv) > 1 else ''
     # Create and register the filter service
     filter_service = FilterService()
 
@@ -68,7 +70,7 @@ if __name__ == "__main__":
 
     # Register with the name server
     ns = Pyro4.locateNS()
-    ns.register("filter.service", uri)
+    ns.register("filter.service"+ service_number, uri)
 
     print(f"FilterService running with URI: {uri}")
     print("Starting request loop...")

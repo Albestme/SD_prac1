@@ -2,6 +2,7 @@ import Pyro4
 import random
 import threading
 from time import sleep
+import sys
 
 
 Pyro4.config.REQUIRE_EXPOSE = True
@@ -68,10 +69,12 @@ class InsultSubscriber:
         print(f"Subscriber {self.subscriber_id} received insult: {insult}")
 
 if __name__ == "__main__":
+    service_number = int(sys.argv[1]) if len(sys.argv) > 1 else ''
     daemon = Pyro4.Daemon()  # Create Pyro daemon
     ns = Pyro4.locateNS()  # Locate name server
     uri = daemon.register(InsultService())  # Register InsultService instance
-    ns.register("insult.service", uri)  # Register with a unique name
+    ns.register("insult.service" + service_number, uri)  # Register with a unique name
 
     print("Insult server running...")
     daemon.requestLoop()  # Keep server running
+
