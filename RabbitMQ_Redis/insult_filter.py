@@ -1,5 +1,6 @@
 import pika
 from time import sleep
+import multiprocessing
 import threading
 import redis
 
@@ -9,6 +10,7 @@ class InsultFilter:
         self.redis = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
 
         # Start the processing thread
+        self.process_thread = multiprocessing.Process(target=self._process_queue, daemon=True)
         self.process_thread = threading.Thread(target=self._process_queue, daemon=True)
         self.process_thread.start()
 
