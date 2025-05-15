@@ -1,17 +1,17 @@
 import pika
 from time import sleep
 import multiprocessing
-import threading
 import redis
+import os
 
 class InsultFilter:
     def __init__(self):
         self.filtered_texts = []
         self.redis = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
 
+        self.connections = {}
         # Start the processing thread
         self.process_thread = multiprocessing.Process(target=self._process_queue, daemon=True)
-        self.process_thread = threading.Thread(target=self._process_queue, daemon=True)
         self.process_thread.start()
 
     def filter_text(self, text):
@@ -27,11 +27,15 @@ class InsultFilter:
     def append_text_filtering_work_queue(self, text):
         """Append text to the work queue for filtering"""
         # Create a new connection for this operation
-        connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
-        channel = connection.channel()
-
-        # Declare the queue to ensure it exists
-        channel.queue_declare(queue='text_work_queue')
+        pid = os.getpid()
+        if not pid in self.connections:
+            connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+            channel = connection.channel()
+            # Declare the queue to ensure it exists
+            channel.queue_declare(queue='text_work_queue')
+            self.connections[pid] = (pid, channel)
+        else:
+            channel = self.connections[pid][1]
 
         # Publish the message
         channel.basic_publish(
@@ -39,10 +43,8 @@ class InsultFilter:
             routing_key='text_work_queue',
             body=text
         )
-        print(f"Text appended to work queue: {text}")
+        # print(f"Text appended to work queue: {text}")
 
-        # Close the connection
-        connection.close()
 
     def list_filtered_results(self):
         """List all filtered results"""
