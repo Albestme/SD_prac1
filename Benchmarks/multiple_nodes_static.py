@@ -29,11 +29,11 @@ def stressfull_client(lb, iterations, service_type):
     print(f'{os.getpid()}: ' + str(end_time - start_time))
 
 
-def stress_service(load_balancers, architecture, iterations_per_client, service_type):
+def stress_service(load_balancers, architecture, iterations, service_type):
     start_time = time.time()
     processes = []
-    base_chunk = iterations_per_client // len(load_balancers)
-    remainder = iterations_per_client % len(load_balancers)
+    base_chunk = iterations // len(load_balancers)
+    remainder = iterations % len(load_balancers)
     chunks = [base_chunk+remainder, base_chunk, base_chunk]
     for lb, i in zip(load_balancers, range(len(load_balancers))):
         processes.append(
@@ -44,7 +44,7 @@ def stress_service(load_balancers, architecture, iterations_per_client, service_
         p.join()
     end_time = time.time()
     total_time = end_time - start_time
-    write_csv('multiple_node_static', architecture, len(load_balancers), iterations_per_client, total_time,
+    write_csv('multiple_node_static', architecture, len(load_balancers), iterations, total_time,
               service_type)
 
 
@@ -58,19 +58,19 @@ def benchmark_multi_node_static(module_names, clients, iterations, nodes):
             stress_service(load_balancers, module_name, iterations, 'filter')
 
         elif module_name == 'Pyro':
-            lb = connect_servers(module_name, nodes)
-            lb.stress_insult_service(clients, iterations)
-            lb.stress_filter_service(clients, iterations)
+            load_balancers = connect_servers(module_name, nodes)
+            stress_service(load_balancers, module_name, iterations, 'insult')
+            stress_service(load_balancers, module_name, iterations, 'filter')
 
         elif module_name == 'Redis':
-            lb = connect_servers(module_name, nodes)
-            lb.stress_insult_service(clients, iterations)
-            lb.stress_filter_service(clients, iterations)
+            load_balancers = connect_servers(module_name, nodes)
+            stress_service(load_balancers, module_name, iterations, 'insult')
+            stress_service(load_balancers, module_name, iterations, 'filter')
 
         elif module_name == 'RabbitMQ_Redis':
-            lb = connect_servers(module_name, nodes)
-            lb.stress_insult_service(clients, iterations)
-            lb.stress_filter_service(clients, iterations)
+            load_balancers = connect_servers(module_name, nodes)
+            stress_service(load_balancers, module_name, iterations, 'insult')
+            stress_service(load_balancers, module_name, iterations, 'filter')
 
 
 def connect_servers(module_name, nodes):
@@ -89,14 +89,20 @@ def connect_servers(module_name, nodes):
         return load_balancers
 
     elif module_name == 'Pyro':
-        lb = LoadBalancer('Pyro', 'multi_node_static')
+        load_balancers = []
         ns = Pyro4.locateNS()
-        for i in range(nodes):
-            insult_service_proxy = Pyro4.Proxy(ns.lookup(f"insult.service.{i}"))
-            filter_service_proxy = Pyro4.Proxy(ns.lookup(f"filter.service.{i}"))
-            lb.register_insult_service(insult_service_proxy)
-            lb.register_filter_service(filter_service_proxy)
-        return lb
+        for i in range(1, nodes+1):
+            lb = LoadBalancer(module_name, 'multi_node_static')
+            load_balancers.append(lb)
+
+        for lb in load_balancers:
+            for i in range(1, nodes+1):
+                insult_service_proxy = Pyro4.Proxy(ns.lookup(f"insult.service{i}"))
+                filter_service_proxy = Pyro4.Proxy(ns.lookup(f"filter.service{i}"))
+                lb.register_insult_service(insult_service_proxy)
+                lb.register_filter_service(filter_service_proxy)
+        return load_balancers
+
 
     elif module_name == 'Redis':
         lb = LoadBalancer('Redis', 'multi_node_static')
