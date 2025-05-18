@@ -3,6 +3,7 @@ import threading
 from time import sleep
 from xmlrpc.server import SimpleXMLRPCServer
 import sys
+import os
 
 
 class InsultFilter:
@@ -13,6 +14,8 @@ class InsultFilter:
         # Storage for filtered texts
         self._filter_queue = []
         self._filtered_results = []
+
+        self.calls_count = 0
 
         # Start worker thread to process the queue
         threading.Thread(target=self._process_queue, daemon=True).start()
@@ -28,6 +31,8 @@ class InsultFilter:
     def append_text_filtering_work_queue(self, text):
         """Add text to the filter queue (work queue pattern)"""
         self._filter_queue.append(text)
+        self.calls_count += 1
+        print(f"{os.getpid()}: {self.calls_count}")
         return "Text added to work queue"
 
     def list_filtered_results(self):
@@ -48,12 +53,14 @@ class InsultFilter:
 
 if __name__ == "__main__":
     # Create the filter service
-    filter_service = InsultFilter()
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
+    insult_service_port = int(sys.argv[2]) if len(sys.argv) > 1 else 8001
+    insult_service = xmlrpc.client.ServerProxy(f"http://localhost:{insult_service_port}")
+    filter_service = InsultFilter(insult_service)
     # Create and start XML-RPC server
     server = SimpleXMLRPCServer(("localhost", port), allow_none=True)
     server.register_instance(filter_service)
-    print("InsultFilter service running on port 8001...")
+    print(f"InsultFilter service running on port {port}...")
 
     # Start the server
     server.serve_forever()

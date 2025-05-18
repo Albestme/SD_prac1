@@ -37,7 +37,7 @@ def connect_servers(module_name, nodes):
         lb = LoadBalancer('XMLRPC', 'multi_node_static')
         for i in range(nodes):
             insult_service_proxy = xmlrpc.client.ServerProxy(f'http://localhost:{8000 + i}')
-            filter_service_proxy = xmlrpc.client.ServerProxy(f'http://localhost:{8000 + nodes + i}')
+            filter_service_proxy = xmlrpc.client.ServerProxy(f'http://localhost:{8003 + i}')
             lb.register_insult_service(insult_service_proxy)
             lb.register_filter_service(filter_service_proxy)
         return lb
@@ -54,11 +54,10 @@ def connect_servers(module_name, nodes):
 
     elif module_name == 'Redis':
         lb = LoadBalancer('Redis', 'multi_node_static')
-        for i in range(nodes):
-            insult_service = Redis_Insult_Service()
-            filter_service = Redis_Filter_Service()
-            lb.register_insult_service(insult_service)
-            lb.register_filter_service(filter_service)
+        insult_service = Redis_Insult_Service()
+        filter_service = Redis_Filter_Service()
+        lb.register_insult_service(insult_service)
+        lb.register_filter_service(filter_service)
 
         return lb
 
@@ -77,6 +76,6 @@ def connect_servers(module_name, nodes):
 
 if __name__ == '__main__':
     # Define the module name
-    architectures = ['Redis', 'RabbitMQ_Redis']
+    architectures = ['XMLRPC']
 
     benchmark_multi_node_static(architectures, 3, 20000, 2)

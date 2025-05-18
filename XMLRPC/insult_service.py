@@ -4,6 +4,7 @@ from time import sleep
 import random
 import xmlrpc.client
 import sys
+import os
 
 
 class InsultService:
@@ -12,9 +13,13 @@ class InsultService:
         self.subscribers = []
         threading.Thread(target=self._broadcast_insults, daemon=True).start()
 
+        self.calls_count = 0
+
     def add_insult(self, insult):
         """Add an insult if not already in the list"""
         self.insults.add(insult)
+        self.calls_count += 1
+        print(f"{os.getpid()}: {self.calls_count}")
 
     def list_insults(self):
         """Return all stored insults"""
