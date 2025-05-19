@@ -7,21 +7,21 @@ Pyro4.config.REQUIRE_EXPOSE = True
 
 @Pyro4.expose
 class FilterService:
-    def __init__(self):
+    def __init__(self, insult_service_number=''):
         self.filtered_texts = []
         self.work_queue = []
         self.insult_service = None
-        print(self.connect_to_insult_service())
+        print(self.connect_to_insult_service(insult_service_number))
 
         # Start worker thread to process the queue
         self.worker_thread = threading.Thread(target=self._process_queue)
         self.worker_thread.daemon = True
         self.worker_thread.start()
 
-    def connect_to_insult_service(self):
+    def connect_to_insult_service(self, number=''):
         # Connect to InsultService via the name server
         ns = Pyro4.locateNS()
-        uri = ns.lookup("insult.service")
+        uri = ns.lookup(f"insult.service{number}")
         self.insult_service = Pyro4.Proxy(uri)
         return "Connected to insult service"
 
@@ -60,7 +60,7 @@ class FilterService:
 if __name__ == "__main__":
     service_number = int(sys.argv[1]) if len(sys.argv) > 1 else ''
     # Create and register the filter service
-    filter_service = FilterService()
+    filter_service = FilterService(service_number)
 
     # Create a daemon
     daemon = Pyro4.Daemon()
@@ -70,7 +70,7 @@ if __name__ == "__main__":
 
     # Register with the name server
     ns = Pyro4.locateNS()
-    ns.register("filter.service"+ service_number, uri)
+    ns.register(f"filter.service{service_number}", uri)
 
     print(f"FilterService running with URI: {uri}")
     print("Starting request loop...")

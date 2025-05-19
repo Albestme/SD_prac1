@@ -73,8 +73,8 @@ if __name__ == "__main__":
     daemon = Pyro4.Daemon()  # Create Pyro daemon
     ns = Pyro4.locateNS()  # Locate name server
     uri = daemon.register(InsultService())  # Register InsultService instance
-    ns.register("insult.service" + service_number, uri)  # Register with a unique name
+    ns.register(f"insult.service{service_number}", uri)  # Register with a unique name
 
-    print("Insult server running...")
+    print(f"Insult.service{service_number} running...")
     daemon.requestLoop()  # Keep server running
 
