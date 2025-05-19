@@ -48,7 +48,8 @@ class InsultFilter:
                 filtered = self.filter_text(text)
                 self._filtered_results.append(filtered)
                 print(f"Filtered: '{text}' → '{filtered}'")
-            sleep(60)
+            sleep(0.01)
+
 
 
 if __name__ == "__main__":
@@ -63,6 +64,9 @@ if __name__ == "__main__":
     print(f"InsultFilter service running on port {port}...")
 
     # Start the server
-    server.serve_forever()
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
 
 

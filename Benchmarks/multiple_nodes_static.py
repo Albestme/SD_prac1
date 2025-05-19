@@ -10,124 +10,143 @@ import multiprocessing
 import time
 from Benchmarks.benchmark_decorator import write_csv
 import random
-import os
 
 
-def stressfull_client(lb, iterations, service_type):
-    start_time = time.time()
-    lenght = len(lb.insult_services)
-    if service_type == 'insult':
-        for i in range(iterations):
-            service = lb.insult_services[i % lenght].insult_service
-            service.add_insult(random.choice(lb.insults))
-    elif service_type == 'filter':
-        for i in range(iterations):
-            service = lb.filter_services[i % lenght].filter_service
-            service.append_text_filtering_work_queue(random.choice(lb.texts))
+# -------------------------------
+# Client Worker Function
+# -------------------------------
+def stressfull_client(client_id, module_name, nodes, iterations, service_type):
+    texts = [
+        'JAJAJA, Im sorry, but you are dumb and stupid',
+        'I love to see a moron cry',
+        'stupid idiot I hate you',
+        'Only a groomer would say that',
+        'I love to way acrotomophile cry',
+        'Que viva España',
+        'You are an air head and an accident',
+        'I love how strawberries taste'
+    ]
+    insults = ['dumb', 'moron', 'stupid', 'idiot', 'groomer', 'acrotomophile', 'air head', 'accident']
 
-    end_time = time.time()
-    print(f'{os.getpid()}: ' + str(end_time - start_time))
+    try:
+        # Connect services inside the client process
+        lb = connect_servers(module_name, nodes)
+
+        if not lb:
+            print(f"Client {client_id}: Failed to connect to servers.")
+            return
+
+        start_time = time.time()
+
+        if service_type == 'insult':
+            for _ in range(iterations):
+                service = lb.get_insult_service_round_robin()
+                service.add_insult(random.choice(insults))
+
+        elif service_type == 'filter':
+            for _ in range(iterations):
+                service = lb.get_filter_service_round_robin()
+                service.append_text_filtering_work_queue(random.choice(texts))
+
+        end_time = time.time()
+        print(f"Client {client_id} completed {iterations} iterations in {end_time - start_time:.4f}s")
+
+    except Exception as e:
+        print(f"Client {client_id} encountered an error: {e}")
 
 
-def stress_service(load_balancers, architecture, iterations, service_type):
+# -------------------------------
+# Benchmark Execution
+# -------------------------------
+def stress_service(module_name, nodes, iterations, service_type, num_clients):
     start_time = time.time()
     processes = []
-    base_chunk = iterations // len(load_balancers)
-    remainder = iterations % len(load_balancers)
-    chunks = [base_chunk+remainder, base_chunk, base_chunk]
-    for lb, i in zip(load_balancers, range(len(load_balancers))):
-        processes.append(
-            multiprocessing.Process(target=stressfull_client, args=(lb, chunks[i], service_type)))
-        processes[i].start()
+
+    for i in range(num_clients):
+        p = multiprocessing.Process(
+            target=stressfull_client,
+            args=(i, module_name, nodes, iterations, service_type)
+        )
+        processes.append(p)
+        p.start()
 
     for p in processes:
         p.join()
+
     end_time = time.time()
     total_time = end_time - start_time
-    write_csv('multiple_node_static', architecture, len(load_balancers), iterations, total_time,
-              service_type)
+    print(f"Total time for {num_clients} clients: {total_time:.2f}s")
+    write_csv('multiple_node_static', module_name, num_clients, iterations, total_time, service_type, nodes)
 
 
-
+# -------------------------------
+# Benchmark Orchestrator
+# -------------------------------
 def benchmark_multi_node_static(module_names, clients, iterations, nodes):
     for module_name in module_names:
-        print("starting benchmark for module:", module_name)
+        print("Starting benchmark for module:", module_name)
         if module_name == 'XMLRPC':
-            load_balancers = connect_servers(module_name, nodes)
-            stress_service(load_balancers, module_name, iterations, 'insult')
-            stress_service(load_balancers, module_name, iterations, 'filter')
+            stress_service(module_name, nodes, iterations, 'insult', clients)
+            stress_service(module_name, nodes, iterations, 'filter', clients)
 
         elif module_name == 'Pyro':
-            load_balancers = connect_servers(module_name, nodes)
-            stress_service(load_balancers, module_name, iterations, 'insult')
-            stress_service(load_balancers, module_name, iterations, 'filter')
+            stress_service(module_name, nodes, iterations, 'insult', clients)
+            stress_service(module_name, nodes, iterations, 'filter', clients)
 
         elif module_name == 'Redis':
-            load_balancers = connect_servers(module_name, nodes)
-            stress_service(load_balancers, module_name, iterations, 'insult')
-            stress_service(load_balancers, module_name, iterations, 'filter')
+            stress_service(module_name, nodes, iterations, 'insult', clients)
+            stress_service(module_name, nodes, iterations, 'filter', clients)
 
         elif module_name == 'RabbitMQ_Redis':
-            load_balancers = connect_servers(module_name, nodes)
-            stress_service(load_balancers, module_name, iterations, 'insult')
-            stress_service(load_balancers, module_name, iterations, 'filter')
+            stress_service(module_name, nodes, iterations, 'insult', clients)
+            stress_service(module_name, nodes, iterations, 'filter', clients)
 
 
+# -------------------------------
+# Server Connection Logic (Now Process-safe)
+# -------------------------------
 def connect_servers(module_name, nodes):
     if module_name == 'XMLRPC':
-        load_balancers = []
-        for i in range(nodes):
-            lb = LoadBalancer('XMLRPC', 'multi_node_static')
-            load_balancers.append(lb)
+        lb = LoadBalancer('XMLRPC', 'multi_node_static')
 
-        for lb in load_balancers:
-            for i in range(nodes):
-                insult_service_proxy = xmlrpc.client.ServerProxy(f'http://localhost:{8000 + i}')
-                filter_service_proxy = xmlrpc.client.ServerProxy(f'http://localhost:{8003 + i}')
-                lb.register_insult_service(insult_service_proxy)
-                lb.register_filter_service(filter_service_proxy)
-        return load_balancers
+        for j in range(nodes):
+            insult_proxy = xmlrpc.client.ServerProxy(f'http://localhost:{8000 + j}', allow_none=True)
+            filter_proxy = xmlrpc.client.ServerProxy(f'http://localhost:{8003 + j}', allow_none=True)
+
+            lb.register_insult_service(insult_proxy)
+            lb.register_filter_service(filter_proxy)
+
+        return lb
 
     elif module_name == 'Pyro':
-        load_balancers = []
+        lb = LoadBalancer('Pyro', 'multi_node_static')
         ns = Pyro4.locateNS()
-        for i in range(1, nodes+1):
-            lb = LoadBalancer(module_name, 'multi_node_static')
-            load_balancers.append(lb)
-
-        for lb in load_balancers:
-            for i in range(1, nodes+1):
-                insult_service_proxy = Pyro4.Proxy(ns.lookup(f"insult.service{i}"))
-                filter_service_proxy = Pyro4.Proxy(ns.lookup(f"filter.service{i}"))
-                lb.register_insult_service(insult_service_proxy)
-                lb.register_filter_service(filter_service_proxy)
-        return load_balancers
-
+        for i in range(nodes):
+            insult_proxy = Pyro4.Proxy(ns.lookup(f"insult.service.{i}"))
+            filter_proxy = Pyro4.Proxy(ns.lookup(f"filter.service.{i}"))
+            lb.register_insult_service(insult_proxy)
+            lb.register_filter_service(filter_proxy)
+        return lb
 
     elif module_name == 'Redis':
         lb = LoadBalancer('Redis', 'multi_node_static')
-        insult_service = Redis_Insult_Service()
-        filter_service = Redis_Filter_Service()
-        lb.register_insult_service(insult_service)
-        lb.register_filter_service(filter_service)
-
+        lb.register_insult_service(Redis_Insult_Service())
+        lb.register_filter_service(Redis_Filter_Service())
         return lb
 
     elif module_name == 'RabbitMQ_Redis':
         lb = LoadBalancer('RabbitMQ_Redis', 'multi_node_static')
         for i in range(nodes):
-            insult_service = RabbitMQ_Insult_Service()
-            filter_service = RabbitMQ_Filter_Service()
-            lb.register_insult_service(insult_service)
-            lb.register_filter_service(filter_service)
-
+            lb.register_insult_service(RabbitMQ_Insult_Service())
+            lb.register_filter_service(RabbitMQ_Filter_Service())
         return lb
 
     return None
 
 
+# -------------------------------
+# Main Entry Point
+# -------------------------------
 if __name__ == '__main__':
-    # Define the module name
     architectures = ['XMLRPC']
-
-    benchmark_multi_node_static(architectures, 3, 20000, 3)
+    benchmark_multi_node_static(architectures, clients=40, iterations=3000, nodes=3)

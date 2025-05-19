@@ -1,8 +1,8 @@
 from xmlrpc.server import SimpleXMLRPCServer
-import threading
 from time import sleep
 import random
 import xmlrpc.client
+import multiprocessing
 import sys
 import os
 
@@ -11,7 +11,7 @@ class InsultService:
     def __init__(self):
         self.insults = set()
         self.subscribers = []
-        threading.Thread(target=self._broadcast_insults, daemon=True).start()
+        multiprocessing.Process(target=self._broadcast_insults, daemon=True).start()
 
         self.calls_count = 0
 
@@ -63,4 +63,7 @@ if __name__ == "__main__":
     server = SimpleXMLRPCServer(("localhost", port), allow_none=True)
     server.register_instance(InsultService())
     print(f"InsultService running on port {port}...")
-    server.serve_forever()
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
