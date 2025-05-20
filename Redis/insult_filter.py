@@ -1,13 +1,19 @@
 import redis
 import multiprocessing
+from redis.cluster import ClusterNode
 
 class InsultFilter:
     def __init__(self):
-        self.client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+        self.client = redis.cluster.RedisCluster(startup_nodes=[
+            ClusterNode('172.28.0.2', '6379'),
+            ClusterNode('172.28.0.3', '6379'),
+            ClusterNode('172.28.0.4', '6379')],
+            decode_responses=True)
+
         self.work_queue = 'text_work_queue'
         self.filtered_queue = 'text_filtered_queue'
 
-        multiprocessing.Process(target=self._process_queue, daemon=True).start()
+        #multiprocessing.Process(target=self._process_queue, daemon=True).start()
 
     def filter_text(self, text):
         """Replace insults in text with CENSORED"""
@@ -35,5 +41,5 @@ class InsultFilter:
                 original_text = text[1]
                 filtered = self.filter_text(original_text)
                 self.client.rpush(self.filtered_queue, filtered)
-                print(f"Filtered: '{original_text}' → '{filtered}'")
+                #print(f"Filtered: '{original_text}' → '{filtered}'")
 

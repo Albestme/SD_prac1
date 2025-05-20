@@ -1,57 +1,46 @@
 version: '3.8'
 
 services:
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: rabbitmq_prac1
-    ports:
-      - "5672:5672"
-      - "15672:15672"
+  #rabbitmq:
+  #  image: rabbitmq:3-management
+  #  container_name: rabbitmq_prac1
+  #  ports:
+  #    - "5672:5672"
+  #    - "15672:15672"
 
-  redis:
+  redis-node1:
     image: redis:latest
-    container_name: redis_prac1
+    container_name: redis-node1
+    command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly no
     ports:
-      - "6379:6379"
+      - "7001:6379"
+    networks:
+      redis-net:
+        ipv4_address: 172.28.0.2 # Assign a static IP
 
-# InsultService:
-#   build:
-#     context: dockerfiles
-#     dockerfile: InsultService.dockerfile
-#   container_name: InsultService_prac1
-#   image: insultservice
-#   environment:
-#     - NODE_NAME=InsultService
-#     - REDIS_HOST=redis
-#     - RABBIT_HOST=rabbitmq
-#   ports:
-#     - "5000:5000"
-#   depends_on:
-#     - rabbitmq
-#     - redis
-#   networks:
-#     - distributed-network
-#
-# client:
-#   build:
-#       context: dockerfiles
-#       dockerfile: client.dockerfile
-#   container_name: client_prac1
-#   image: client
-#   environment:
-#     - NODE_NAME=client
-#     - REDIS_HOST=redis
-#     - RABBIT_HOST=rabbitmq
-#   ports:
-#     - "5001:5001"
-#   depends_on:
-#     - rabbitmq
-#     - redis
-#   networks:
-#     - distributed-network
-#   stdin_open: true
-#   tty: true
-#   command: [ "tail", "-f", "/dev/null" ]  # Keeps the container running
-#
-# networks:
-#   distributed-network:
+  redis-node2:
+    image: redis:latest
+    container_name: redis-node2
+    command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly no
+    ports:
+      - "7002:6379"
+    networks:
+      redis-net:
+        ipv4_address: 172.28.0.3 # Assign a static IP
+
+  redis-node3:
+    image: redis:latest
+    container_name: redis-node3
+    command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly no
+    ports:
+      - "7003:6379"
+    networks:
+      redis-net:
+        ipv4_address: 172.28.0.4 # Assign a static IP
+
+networks:
+  redis-net:
+    driver: bridge
+    ipam: # IP Address Management
+      config:
+        - subnet: 172.28.0.0/16 # Define the subnet for your network

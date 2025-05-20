@@ -6,10 +6,10 @@ from XMLRPC.insult_filter import InsultFilter as Xmlrpc_Filter_Service
 import csv
 from abc import ABC, abstractmethod
 
-def write_csv(mode, architecture, num_clients, iterations_per_client, elapsed_time, insult_service):
+def write_csv(mode, architecture, num_clients, iterations_per_client, elapsed_time, insult_service, servers=None):
     with open(f'{mode}.csv', mode='a', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow([insult_service, architecture, num_clients, iterations_per_client, elapsed_time])
+        writer.writerow([insult_service, architecture, num_clients, iterations_per_client, servers, elapsed_time])
 
 
 class BenchmarkDecorator(ABC):
