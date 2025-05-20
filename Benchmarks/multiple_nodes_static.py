@@ -10,6 +10,7 @@ import multiprocessing
 import time
 from Benchmarks.benchmark_decorator import write_csv
 import random
+from time import sleep
 
 
 # -------------------------------
@@ -28,37 +29,45 @@ def stressfull_client(client_id, module_name, nodes, iterations, service_type):
     ]
     insults = ['dumb', 'moron', 'stupid', 'idiot', 'groomer', 'acrotomophile', 'air head', 'accident']
 
-    try:
-        # Connect services inside the client process
-        lb = connect_servers(module_name, nodes)
+    # Connect services inside the client process
+    lb = connect_servers(module_name, nodes)
 
-        if not lb:
-            print(f"Client {client_id}: Failed to connect to servers.")
-            return
+    if not lb:
+        print(f"Client {client_id}: Failed to connect to servers.")
+        return
 
-        start_time = time.time()
+    start_time = time.time()
 
-        if service_type == 'insult':
-            for _ in range(iterations):
+    if service_type == 'insult':
+        for _ in range(iterations):
+            try:
+                service = lb.get_insult_service_round_robin()
+                service.add_insult(random.choice(insults))
+            except Exception as e:
+                sleep(0.01)
+                print(f"Client {client_id}: Error adding insult: {e}")
                 service = lb.get_insult_service_round_robin()
                 service.add_insult(random.choice(insults))
 
-        elif service_type == 'filter':
-            for _ in range(iterations):
+    elif service_type == 'filter':
+        for _ in range(iterations):
+            try:
+                service = lb.get_filter_service_round_robin()
+                service.append_text_filtering_work_queue(random.choice(texts))
+            except Exception as e:
+                sleep(0.01)
+                print(f"Client {client_id}: Error filtering text: {e}")
                 service = lb.get_filter_service_round_robin()
                 service.append_text_filtering_work_queue(random.choice(texts))
 
-        end_time = time.time()
-        print(f"Client {client_id} completed {iterations} iterations in {end_time - start_time:.4f}s")
-
-    except Exception as e:
-        print(f"Client {client_id} encountered an error: {e}")
+    end_time = time.time()
+    print(f"Client {client_id} completed {iterations} iterations in {end_time - start_time:.4f}s")
 
 
 # -------------------------------
 # Benchmark Execution
 # -------------------------------
-def stress_service(module_name, nodes, iterations, service_type, num_clients):
+def stress_service(module_name, nodes, iterations, service_type, num_clients, mode):
     start_time = time.time()
     processes = []
 
@@ -76,30 +85,30 @@ def stress_service(module_name, nodes, iterations, service_type, num_clients):
     end_time = time.time()
     total_time = end_time - start_time
     print(f"Total time for {num_clients} clients: {total_time:.2f}s")
-    write_csv('multiple_node_static', module_name, num_clients, iterations, total_time, service_type, nodes)
+    write_csv(mode, module_name, num_clients, iterations, total_time, service_type, nodes)
 
 
 # -------------------------------
 # Benchmark Orchestrator
 # -------------------------------
-def benchmark_multi_node_static(module_names, clients, iterations, nodes):
+def benchmark_multi_node_static(module_names, mode, clients, iterations, nodes):
     for module_name in module_names:
         print("Starting benchmark for module:", module_name)
         if module_name == 'XMLRPC':
-            stress_service(module_name, nodes, iterations, 'insult', clients)
-            stress_service(module_name, nodes, iterations, 'filter', clients)
+            stress_service(module_name, nodes, iterations, 'insult', clients, mode)
+            stress_service(module_name, nodes, iterations, 'filter', clients, mode)
 
         elif module_name == 'Pyro':
-            stress_service(module_name, nodes, iterations, 'insult', clients)
-            stress_service(module_name, nodes, iterations, 'filter', clients)
+            stress_service(module_name, nodes, iterations, 'insult', clients, mode)
+            stress_service(module_name, nodes, iterations, 'filter', clients, mode)
 
         elif module_name == 'Redis':
-            stress_service(module_name, nodes, iterations, 'insult', clients)
-            stress_service(module_name, nodes, iterations, 'filter', clients)
+            stress_service(module_name, nodes, iterations, 'insult', clients, mode)
+            stress_service(module_name, nodes, iterations, 'filter', clients, mode)
 
         elif module_name == 'RabbitMQ_Redis':
-            stress_service(module_name, nodes, iterations, 'insult', clients)
-            stress_service(module_name, nodes, iterations, 'filter', clients)
+            stress_service(module_name, nodes, iterations, 'insult', clients, mode)
+            stress_service(module_name, nodes, iterations, 'filter', clients, mode)
 
 
 # -------------------------------
@@ -122,14 +131,15 @@ def connect_servers(module_name, nodes):
         lb = LoadBalancer('Pyro', 'multi_node_static')
         ns = Pyro4.locateNS()
         for i in range(nodes):
-            insult_proxy = Pyro4.Proxy(ns.lookup(f"insult.service.{i}"))
-            filter_proxy = Pyro4.Proxy(ns.lookup(f"filter.service.{i}"))
+            insult_proxy = Pyro4.Proxy(ns.lookup(f"insult.service{i}"))
+            filter_proxy = Pyro4.Proxy(ns.lookup(f"filter.service{i}"))
             lb.register_insult_service(insult_proxy)
             lb.register_filter_service(filter_proxy)
         return lb
 
     elif module_name == 'Redis':
         lb = LoadBalancer('Redis', 'multi_node_static')
+
         lb.register_insult_service(Redis_Insult_Service())
         lb.register_filter_service(Redis_Filter_Service())
         return lb
@@ -148,5 +158,6 @@ def connect_servers(module_name, nodes):
 # Main Entry Point
 # -------------------------------
 if __name__ == '__main__':
-    architectures = ['XMLRPC']
-    benchmark_multi_node_static(architectures, clients=40, iterations=3000, nodes=3)
+    architectures = ['Redis']
+    data = 'multiple_node_static'
+    benchmark_multi_node_static(architectures, data, clients=1, iterations=200000, nodes=3)
