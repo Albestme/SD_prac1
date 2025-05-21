@@ -4,23 +4,22 @@ from time import sleep
 import multiprocessing
 from Redis.subscriber import start_subscriber
 from redis.cluster import ClusterNode
+import threading
 
 
 class InsultService:
     def __init__(self):
-        self.client = redis.cluster.RedisCluster(startup_nodes=[
-            ClusterNode('172.28.0.2', '6379'),
-            ClusterNode('172.28.0.3', '6379'),
-            ClusterNode('172.28.0.4', '6379')],
-            decode_responses=True)
-        self.insult_channel = "insult_service"
+        self.client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+        self.insult_list = "insult_list"
+        self.insult_queue = 'insult_work_queue'
         self.broadcast_chanel = "broadcast_channel"
         self.subscribers = []
 
-        #multiprocessing.Process(target=self._broadcast_random_insult, daemon=True).start()
+        threading.Thread(target=self._process_insult_queue).start()
+        threading.Thread(target=self._broadcast_random_insult, daemon=True).start()
 
     def get_insults(self):
-        return self.client.lrange(self.insult_channel, 0, -1)
+        return self.client.lrange(self.insult_list, 0, -1)
 
     def add_insult(self, insult):
         """Add a new insult to the list """
@@ -28,7 +27,7 @@ class InsultService:
         if insult in insults:
             return "Insult already in redis list"
         else:
-            self.client.rpush(self.insult_channel, insult)
+            self.client.rpush(self.insult_list, insult)
             return f"Insult added to redis list: {insult}"
 
     def register_subscriber(self, subscriber_id):
@@ -36,6 +35,13 @@ class InsultService:
         multiprocessing.Process(target=start_subscriber, args=(subscriber_id,)).start()
         self.subscribers.append(subscriber_id)
         print(f"Subscriber {subscriber_id} registered.")
+
+    def _process_insult_queue(self):
+        """Worker that processes the queue in background"""
+        while True:
+            # Process any insults in the queue
+            insult = self.client.blpop(self.insult_list, timeout=0)
+            self.add_insult(insult)
 
     def _broadcast_random_insult(self):
         """Periodically broadcast random insults"""
