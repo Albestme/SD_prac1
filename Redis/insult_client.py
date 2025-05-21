@@ -1,7 +1,7 @@
 import redis
 
 
-class InsultClient:
+class RedisClient:
     def __init__(self):
         self.client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
         self.insult_list = "insult_list"
@@ -16,14 +16,13 @@ class InsultClient:
 
     def add_insults(self, insult):
         """Add a new insult to the Redis list"""
-        self.client.rpush('insult_work_queue', insult)
+        self.client.rpush(self.insult_queue, insult)
         return f"Insult added to Redis list: {insult}"
 
     def append_text_filtering_work_queue(self, text):
         """Append text to the work queue for filtering"""
         self.client.rpush(self.text_work_queue, text)
         return f"Text appended to work queue: {text}"
-
 
     def list_filtered_results(self):
         """List all filtered results"""

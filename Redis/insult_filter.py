@@ -3,15 +3,15 @@ import multiprocessing
 from redis.cluster import ClusterNode
 import threading
 
+
+
 class InsultFilter:
     def __init__(self):
-        #self.client = redis.cluster.RedisCluster(startup_nodes=[
-        #    ClusterNode('172.28.0.2', '6379'),
-        #    ClusterNode('172.28.0.3', '6379'),
-        #    ClusterNode('172.28.0.4', '6379')],
-        #    decode_responses=True)
         self.client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
 
+        # Save insult list ot not overwhelm redis
+        # In a real distributed system I should request the insults to redis
+        self.insults = ['dumb', 'moron', 'stupid', 'idiot', 'groomer', 'acrotomophile', 'air head', 'accident']
         self.filtered_queue = 'text_filtered_queue'
         self.text_work_queue = 'text_work_queue'
 
@@ -20,8 +20,7 @@ class InsultFilter:
     def filter_text(self, text):
         """Replace insults in text with CENSORED"""
         filtered = text
-        insults = self.client.lrange('insult_service', 0, -1)  # Get all insults from Redis
-        for insult in insults:
+        for insult in self.insults:
             filtered = filtered.replace(insult, "CENSORED")
         return filtered
 

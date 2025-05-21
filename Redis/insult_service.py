@@ -14,19 +14,21 @@ class InsultService:
         self.insult_queue = 'insult_work_queue'
         self.broadcast_chanel = "broadcast_channel"
         self.subscribers = []
+        self.insults = []
 
         threading.Thread(target=self._process_insult_queue).start()
         threading.Thread(target=self._broadcast_random_insult, daemon=True).start()
 
+    # In a real distributed system I should request the insults to redis
     def get_insults(self):
-        return self.client.lrange(self.insult_list, 0, -1)
+        return self.insults
 
     def add_insult(self, insult):
         """Add a new insult to the list """
-        insults = self.get_insults()
-        if insult in insults:
+        if insult in self.insults:
             return "Insult already in redis list"
         else:
+            self.insults.append(insult)
             self.client.rpush(self.insult_list, insult)
             return f"Insult added to redis list: {insult}"
 
@@ -40,7 +42,7 @@ class InsultService:
         """Worker that processes the queue in background"""
         while True:
             # Process any insults in the queue
-            insult = self.client.blpop(self.insult_list, timeout=0)
+            insult = self.client.blpop(self.insult_queue, timeout=0)
             self.add_insult(insult)
 
     def _broadcast_random_insult(self):
@@ -52,3 +54,10 @@ class InsultService:
                 insult = random.choice(insults)
                 print(f"Broadcasting insult: {insult}")
                 self.client.publish(self.broadcast_chanel, insult)
+
+if __name__ == "__main__":
+    # Example usage
+    service = InsultService()
+
+    while True:
+        sleep(5)
