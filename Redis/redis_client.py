@@ -1,3 +1,5 @@
+from time import sleep
+
 import redis
 
 
@@ -9,12 +11,14 @@ class RedisClient:
         self.broadcast_chanel = "broadcast_channel"
         self.filtered_queue = 'text_filtered_queue'
         self.text_work_queue = 'text_work_queue'
+        self.insult_requests_key = "insult_service_requests"
+        self.filter_requests_key = "filter_service_requests"
 
     def get_insults(self):
         """Get all insults from the Redis list"""
         return self.client.lrange(self.insult_list, 0, -1)
 
-    def add_insults(self, insult):
+    def add_insult(self, insult):
         """Add a new insult to the Redis list"""
         self.client.rpush(self.insult_queue, insult)
         return f"Insult added to Redis list: {insult}"
@@ -27,3 +31,19 @@ class RedisClient:
     def list_filtered_results(self):
         """List all filtered results"""
         return self.client.lrange(self.filtered_queue, 0, -1)
+
+    def wait_insult_requests_processing(self, iterations):
+        self.client.set(self.insult_requests_key, '0')
+        while True:
+            sleep(0.1)
+            processed = self.client.get(self.insult_requests_key)
+            print(processed, ' ', iterations)
+            if int(processed) == iterations:
+                break
+
+    def wait_filter_requests_processing(self, iterations):
+        while True:
+            sleep(0.1)
+            processed = self.client.get(self.filter_requests_key)
+            if processed == iterations:
+                break
