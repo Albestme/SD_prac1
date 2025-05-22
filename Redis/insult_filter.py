@@ -33,7 +33,7 @@ class InsultFilter:
         while True:
             sleep(0.1)
             requests = self.requests
-            if not logged_requests == requests and requests % 10 == 0:
+            if not logged_requests == requests:
                 self.client.incrby(self.requests_key, requests-logged_requests)
                 logged_requests = requests
 
@@ -54,3 +54,7 @@ def start_insult_filter():
     InsultFilter()
     while True:
         sleep(10)
+
+if __name__ == "__main__":
+    # Start the insult filter service
+    start_insult_filter()

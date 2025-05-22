@@ -13,7 +13,7 @@ class InsultService:
         self.broadcast_chanel = "broadcast_channel"
         self.requests_key = "insult_service_requests"
         self.requests = 0
-        self.client.set(self.requests_key, 0)
+
 
         self.subscribers = []
         self.insults = []
@@ -46,7 +46,7 @@ class InsultService:
         while True:
             sleep(0.1)
             requests = self.requests
-            if not logged_requests == requests and requests % 10 == 0:
+            if not logged_requests == requests:
                 self.client.incrby(self.requests_key, requests-logged_requests)
                 logged_requests = requests
 

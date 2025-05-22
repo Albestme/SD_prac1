@@ -42,8 +42,9 @@ class RedisClient:
                 break
 
     def wait_filter_requests_processing(self, iterations):
+        self.client.set(self.filter_requests_key, '0')
         while True:
             sleep(0.1)
             processed = self.client.get(self.filter_requests_key)
-            if processed == iterations:
+            if int(processed) >= iterations:
                 break
