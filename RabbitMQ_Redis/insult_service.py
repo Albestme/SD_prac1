@@ -19,23 +19,21 @@ class InsultService:
         print("InsultService waiting for insults...")
 
         # Start a redis queue to store insults
-        self.redis = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
-        self.insult_channel = "insult_list"
+        self.insults = ['dumb', 'moron', 'stupid', 'idiot', 'groomer', 'acrotomophile', 'air head', 'accident']
 
         # Start broadcasting thread
         multiprocessing.Process(target=self._broadcast_random_insult, daemon=True).start()
 
 
     def get_insults(self):
-        return self.redis.lrange(self.insult_channel, 0, -1)
+        return self.insults
 
     def add_insult(self, insult):
         """Add a new insult to the list"""
-        insults = self.get_insults()
-        if insult in insults:
+        if insult in self.insults:
             return "Insult already in redis list"
         else:
-            self.redis.rpush(self.insult_channel, insult)
+            self.insults.append(insult)
             return f"Insult added to redis list: {insult}"
 
     def register_subscriber(self, subscriber_id):
@@ -61,12 +59,10 @@ class InsultService:
                 )
 
 
-if __name__ == "__main__":
+def start_insult_server():
     InsultService()
-    try:
-        # Keep the program running
-        print("Service started. Press CTRL+C to exit.")
-        while True:
-            sleep(1)
-    except KeyboardInterrupt:
-        print("Shutting down service...")
+    while True:
+        sleep(10)
+
+if __name__ == "__main__":
+    start_insult_server()

@@ -7,7 +7,8 @@ import os
 class InsultFilter:
     def __init__(self):
         self.filtered_texts = []
-        self.redis = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+
+        self.insults = ['dumb', 'moron', 'stupid', 'idiot', 'groomer', 'acrotomophile', 'air head', 'accident']
 
         self.connections = {}
         # Start the processing thread
@@ -17,9 +18,7 @@ class InsultFilter:
     def filter_text(self, text):
         """Replace insults in text with CENSORED"""
         filtered = text
-        insults = self.redis.lrange('insult_list', 0, -1)
-
-        for insult in insults:
+        for insult in self.insults:
             filtered = filtered.replace(insult, "CENSORED")
 
         return filtered
@@ -86,13 +85,12 @@ class InsultFilter:
         finally:
             connection.close()
 
-if __name__ == "__main__":
-    filter_service = InsultFilter()
-    try:
-        # Keep the program running
-        print("Service started. Press CTRL+C to exit.")
-        while True:
-            sleep(1)
-    except KeyboardInterrupt:
-        print("Shutting down service...")
+def start_insult_filter():
+    """Start the InsultFilter service"""
+    InsultFilter()
+    while True:
+        sleep(10)
 
+
+if __name__ == "__main__":
+    start_insult_filter()
