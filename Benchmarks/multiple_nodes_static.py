@@ -14,14 +14,17 @@ from time import sleep
 from RabbitMQ.rabbit_client import RabbitMQClient
 
 
-def benchmark_redis_rabbit(client, service_type, iterations, nodes, texts, insults):
+def benchmark_redis_rabbit(client, middleware, service_type, iterations, nodes, texts, insults):
     processes = []
     if service_type == 'insult':
         for _ in range(iterations):
             client.add_insult(random.choice(insults))
         start_time = time.time()
         for i in range(nodes):
-            processes.append(multiprocessing.Process(target=redis_insult_server))
+            if middleware == 'RabbitMQ':
+                processes.append(multiprocessing.Process(target=rabbit_insult_server))
+            else:
+                processes.append(multiprocessing.Process(target=redis_insult_server))
             processes[i].start()
         client.wait_insult_requests_processing(iterations)
 
@@ -30,14 +33,19 @@ def benchmark_redis_rabbit(client, service_type, iterations, nodes, texts, insul
             client.append_text_filtering_work_queue(random.choice(texts))
         start_time = time.time()
         for i in range(nodes):
-            processes.append(multiprocessing.Process(target=redis_filter_server))
+            if middleware == 'RabbitMQ':
+                processes.append(multiprocessing.Process(target=rabbit_filter_server))
+            else:
+                processes.append(multiprocessing.Process(target=redis_filter_server))
             processes[i].start()
         client.wait_filter_requests_processing(iterations)
+
+    total_time = time.time() - start_time
 
     for p in processes:
         p.terminate()
 
-    return time.time() - start_time
+    return total_time
 
 def stressfull_client(client_id, module_name, nodes, iterations, service_type):
     texts = [
@@ -54,11 +62,11 @@ def stressfull_client(client_id, module_name, nodes, iterations, service_type):
 
     if module_name == 'Redis':
         redis_client = RedisClient()
-        benchmark_redis_rabbit(redis_client, service_type, iterations, nodes, texts, insults)
+        total_time = benchmark_redis_rabbit(redis_client, 'Redis', service_type, iterations, nodes, texts, insults)
 
     elif module_name == 'RabbitMQ':
         rabbit_client = RabbitMQClient()
-        benchmark_redis_rabbit(rabbit_client, service_type, iterations, nodes, texts, insults)
+        total_time = benchmark_redis_rabbit(rabbit_client, 'RabbitMQ', service_type, iterations, nodes, texts, insults)
 
     if module_name == 'XMLRPC' or module_name == 'Pyro':
         lb = connect_servers(module_name, nodes)
@@ -90,10 +98,9 @@ def stressfull_client(client_id, module_name, nodes, iterations, service_type):
                     service = lb.get_filter_service_round_robin()
                     service.append_text_filtering_work_queue(random.choice(texts))
 
-    end_time = time.time()
-    print(f"Client {client_id} completed {iterations} iterations in {end_time - start_time:.4f}s")
-
-
+        total_time = time.time() - start_time
+    print(f"Client {client_id} completed {iterations} iterations in {total_time:.4f}s")
+    return None
 
 
 # -------------------------------
@@ -175,4 +182,4 @@ def connect_servers(module_name, nodes):
 if __name__ == '__main__':
     architectures = ['RabbitMQ']
     data = 'rabbit_data'
-    benchmark_multi_node_static(architectures, data, clients=1, iterations=30000, nodes=1)
+    benchmark_multi_node_static(architectures, data, clients=1, iterations=8000, nodes=3)

@@ -1,49 +1,40 @@
 import pika
-from time import sleep
+from time import sleep, time
 import multiprocessing
-import redis
-import os
+import threading
+import uuid
+
 
 class InsultFilter:
     def __init__(self):
         self.filtered_texts = []
-
         self.insults = ['dumb', 'moron', 'stupid', 'idiot', 'groomer', 'acrotomophile', 'air head', 'accident']
-
+        self.filtered_count = 0  # Counter for processed texts
         self.connections = {}
-        # Start the processing thread
-        self.process_thread = multiprocessing.Process(target=self._process_queue, daemon=True)
+
+        # Setup RabbitMQ
+        self.connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+        self.channel = self.connection.channel()
+
+        # Fanout exchange for broadcasting count requests
+        self.channel.exchange_declare(exchange='filter_request_exchange', exchange_type='fanout')
+
+        # Each instance has a unique private queue for replies
+        self.server_id = str(uuid.uuid4())
+        self.private_queue = self.channel.queue_declare(queue='').method.queue
+        self.channel.queue_bind(exchange='filter_request_exchange', queue=self.private_queue)
+
+        # Start processing thread
+        self.process_thread = threading.Thread(target=self._process_queue, daemon=True)
         self.process_thread.start()
+        threading.Thread(target=self._listen_for_filter_requests, daemon=True).start()
 
     def filter_text(self, text):
         """Replace insults in text with CENSORED"""
         filtered = text
         for insult in self.insults:
             filtered = filtered.replace(insult, "CENSORED")
-
         return filtered
-
-    def append_text_filtering_work_queue(self, text):
-        """Append text to the work queue for filtering"""
-        # Create a new connection for this operation
-        pid = os.getpid()
-        if not pid in self.connections:
-            connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
-            channel = connection.channel()
-            # Declare the queue to ensure it exists
-            channel.queue_declare(queue='text_work_queue')
-            self.connections[pid] = (pid, channel)
-        else:
-            channel = self.connections[pid][1]
-
-        # Publish the message
-        channel.basic_publish(
-            exchange='',
-            routing_key='text_work_queue',
-            body=text
-        )
-        # print(f"Text appended to work queue: {text}")
-
 
     def list_filtered_results(self):
         """List all filtered results"""
@@ -51,39 +42,51 @@ class InsultFilter:
 
     def _process_queue(self):
         """Worker that processes the queue in background"""
-        # Create a dedicated connection for this consumer thread
         connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
         channel = connection.channel()
 
-        # Declare the queue
         channel.queue_declare(queue='text_work_queue')
 
-        # Set up consumer
         def callback(ch, method, properties, body):
             try:
                 original_text = body.decode()
                 filtered = self.filter_text(original_text)
                 self.filtered_texts.append(filtered)
-                print(f"Filtered: '{original_text}' → '{filtered}'")
+                self.filtered_count += 1  # Increment counter
                 ch.basic_ack(delivery_tag=method.delivery_tag)
             except Exception as e:
                 print(f"Error processing message: {e}")
 
-        # Configure consumer
         channel.basic_qos(prefetch_count=1)
         channel.basic_consume(
             queue='text_work_queue',
             on_message_callback=callback,
-            auto_ack=False  # Changed to False to handle errors properly
+            auto_ack=False
         )
 
         try:
-            # Start consuming
             channel.start_consuming()
-        except Exception as e:
-            print(f"Consumer thread error: {e}")
         finally:
             connection.close()
+
+    def _listen_for_filter_requests(self):
+        """Listen for global count requests via fanout exchange"""
+        connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+        channel = connection.channel()
+        def callback(ch, method, props, body):
+            if body.decode() == 'get_filtered_count':
+                ch.basic_publish(
+                    exchange='',
+                    routing_key=props.reply_to,
+                    properties=pika.BasicProperties(correlation_id=props.correlation_id),
+                    body=str(self.filtered_count)
+                )
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+
+        channel.basic_consume(queue=self.private_queue, on_message_callback=callback, auto_ack=False)
+        print("Filter service is listening for count queries...")
+        channel.start_consuming()
+
 
 def start_insult_filter():
     """Start the InsultFilter service"""

@@ -25,7 +25,7 @@ class InsultService:
 
         # Each server gets its own unique queue for request_count replies
         self.server_id = str(uuid.uuid4())
-        self.private_queue = self.channel.queue_declare(queue='', exclusive=True).method.queue
+        self.private_queue = self.channel.queue_declare(queue='').method.queue
         self.channel.queue_bind(exchange='request_count_exchange', queue=self.private_queue)
         self.requests = 0
 
@@ -36,9 +36,9 @@ class InsultService:
 
         print("InsultService waiting for insults...")
 
-        multiprocessing.Process(target=self._broadcast_random_insult, daemon=True).start()
         threading.Thread(target=self._listen_for_insults, daemon=True).start()
         threading.Thread(target=self._listen_for_request_count, daemon=True).start()
+        multiprocessing.Process(target=self._broadcast_random_insult, daemon=True).start()
 
     def get_insults(self):
         return self.insults
@@ -58,9 +58,10 @@ class InsultService:
         print(f"Subscriber {subscriber_id} registered.")
 
     def _listen_for_request_count(self):
+        connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+        channel = connection.channel()
         def callback(ch, method, properties, body):
             if body.decode() == 'get_request_count':
-                print(f"Received request count query. Replying with {self.request_count}")
                 ch.basic_publish(
                     exchange='',
                     routing_key=properties.reply_to,
@@ -69,9 +70,9 @@ class InsultService:
                 )
             ch.basic_ack(delivery_tag=method.delivery_tag)
 
-        self.channel.basic_consume(queue=self.private_queue, on_message_callback=callback, auto_ack=False)
+        channel.basic_consume(queue=self.private_queue, on_message_callback=callback, auto_ack=False)
         print("Listening for request count queries...")
-        self.channel.start_consuming()
+        channel.start_consuming()
 
     def _broadcast_random_insult(self):
         """Periodically broadcast random insults"""
@@ -95,6 +96,7 @@ class InsultService:
         def callback(ch, method, properties, body):
             insult = body.decode()
             print(f"Received insult {self.requests}")
+            self.requests += 1
             if insult not in self.insults:
                 self.add_insult(insult)
             ch.basic_ack(delivery_tag=method.delivery_tag)
