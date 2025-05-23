@@ -1,10 +1,10 @@
 import pika
-import redis
 import random
 import multiprocessing
-import threading  # <-- New import
+import threading
 from time import sleep
 from RabbitMQ.subscriber import start_subscriber
+import uuid
 
 
 class InsultService:
@@ -20,6 +20,15 @@ class InsultService:
         self.insult_queue = 'insult_queue'
         self.channel.queue_declare(queue=self.insult_queue, durable=True)
 
+        # New: For request count broadcast
+        self.channel.exchange_declare(exchange='request_count_exchange', exchange_type='fanout')
+
+        # Each server gets its own unique queue for request_count replies
+        self.server_id = str(uuid.uuid4())
+        self.private_queue = self.channel.queue_declare(queue='', exclusive=True).method.queue
+        self.channel.queue_bind(exchange='request_count_exchange', queue=self.private_queue)
+        self.requests = 0
+
         # Shared list of insults
         self.insults = ['dumb', 'moron', 'stupid', 'idiot', 'groomer', 'acrotomophile', 'air head', 'accident']
 
@@ -27,9 +36,9 @@ class InsultService:
 
         print("InsultService waiting for insults...")
 
-        # Start threads/processes
         multiprocessing.Process(target=self._broadcast_random_insult, daemon=True).start()
-        threading.Thread(target=self._listen_for_insults, daemon=True).start()  # <-- New listener thread
+        threading.Thread(target=self._listen_for_insults, daemon=True).start()
+        threading.Thread(target=self._listen_for_request_count, daemon=True).start()
 
     def get_insults(self):
         return self.insults
@@ -47,6 +56,22 @@ class InsultService:
         multiprocessing.Process(target=start_subscriber, args=(subscriber_id,)).start()
         self.subscribers.append(subscriber_id)
         print(f"Subscriber {subscriber_id} registered.")
+
+    def _listen_for_request_count(self):
+        def callback(ch, method, properties, body):
+            if body.decode() == 'get_request_count':
+                print(f"Received request count query. Replying with {self.request_count}")
+                ch.basic_publish(
+                    exchange='',
+                    routing_key=properties.reply_to,
+                    properties=pika.BasicProperties(correlation_id=properties.correlation_id),
+                    body=str(self.requests)
+                )
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+
+        self.channel.basic_consume(queue=self.private_queue, on_message_callback=callback, auto_ack=False)
+        print("Listening for request count queries...")
+        self.channel.start_consuming()
 
     def _broadcast_random_insult(self):
         """Periodically broadcast random insults"""
@@ -69,7 +94,7 @@ class InsultService:
 
         def callback(ch, method, properties, body):
             insult = body.decode()
-            print(f"Received new insult: {insult}")
+            print(f"Received insult {self.requests}")
             if insult not in self.insults:
                 self.add_insult(insult)
             ch.basic_ack(delivery_tag=method.delivery_tag)
