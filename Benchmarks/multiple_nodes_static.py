@@ -3,14 +3,41 @@ import Pyro4
 from Redis.redis_client import RedisClient as RedisClient
 from Redis.insult_service import start_insult_server as redis_insult_server
 from Redis.insult_filter import start_insult_filter as redis_filter_server
+from RabbitMQ.insult_service import start_insult_server as rabbit_insult_server
+from RabbitMQ.insult_filter import start_insult_filter as rabbit_filter_server
 from loadbalancer import LoadBalancer
 import multiprocessing
 import time
 from Benchmarks.benchmark_decorator import write_csv
 import random
 from time import sleep
-from multiprocessing import Value
+from RabbitMQ.rabbit_client import RabbitMQClient
 
+
+def benchmark_redis_rabbit(client, service_type, iterations, nodes, texts, insults):
+    processes = []
+    if service_type == 'insult':
+        for _ in range(iterations):
+            client.add_insult(random.choice(insults))
+        start_time = time.time()
+        for i in range(nodes):
+            processes.append(multiprocessing.Process(target=redis_insult_server))
+            processes[i].start()
+        client.wait_insult_requests_processing(iterations)
+
+    else:
+        for _ in range(iterations):
+            client.append_text_filtering_work_queue(random.choice(texts))
+        start_time = time.time()
+        for i in range(nodes):
+            processes.append(multiprocessing.Process(target=redis_filter_server))
+            processes[i].start()
+        client.wait_filter_requests_processing(iterations)
+
+    for p in processes:
+        p.terminate()
+
+    return time.time() - start_time
 
 def stressfull_client(client_id, module_name, nodes, iterations, service_type):
     texts = [
@@ -27,28 +54,11 @@ def stressfull_client(client_id, module_name, nodes, iterations, service_type):
 
     if module_name == 'Redis':
         redis_client = RedisClient()
-        processes = []
-        if service_type == 'insult':
-            for _ in range(iterations):
-                redis_client.add_insult(random.choice(insults))
-            start_time = time.time()
-            for i in range(nodes):
-                processes.append(multiprocessing.Process(target=redis_insult_server))
-                processes[i].start()
-            redis_client.wait_insult_requests_processing(iterations)
+        benchmark_redis_rabbit(redis_client, service_type, iterations, nodes, texts, insults)
 
-        else:
-            for _ in range(iterations):
-                redis_client.append_text_filtering_work_queue(random.choice(texts))
-            start_time = time.time()
-            for i in range(nodes):
-                processes.append(multiprocessing.Process(target=redis_filter_server))
-                processes[i].start()
-            redis_client.wait_filter_requests_processing(iterations)
-
-        for p in processes:
-            p.terminate()
-
+    elif module_name == 'RabbitMQ':
+        rabbit_client = RabbitMQClient()
+        benchmark_redis_rabbit(rabbit_client, service_type, iterations, nodes, texts, insults)
 
     if module_name == 'XMLRPC' or module_name == 'Pyro':
         lb = connect_servers(module_name, nodes)
@@ -82,6 +92,8 @@ def stressfull_client(client_id, module_name, nodes, iterations, service_type):
 
     end_time = time.time()
     print(f"Client {client_id} completed {iterations} iterations in {end_time - start_time:.4f}s")
+
+
 
 
 # -------------------------------
@@ -150,8 +162,8 @@ def connect_servers(module_name, nodes):
         lb.register_filter_service(RedisClient())
         return lb
 
-    elif module_name == 'RabbitMQ_Redis':
-        lb = LoadBalancer('RabbitMQ_Redis', 'multi_node_static')
+    elif module_name == 'RabbitMQ':
+        lb = LoadBalancer('RabbitMQ', 'multi_node_static')
         return lb
 
     return None
@@ -161,6 +173,6 @@ def connect_servers(module_name, nodes):
 # Main Entry Point
 # -------------------------------
 if __name__ == '__main__':
-    architectures = ['Redis']
-    data = 'redis_data'
-    benchmark_multi_node_static(architectures, data, clients=1, iterations=30000, nodes=3)
+    architectures = ['RabbitMQ']
+    data = 'rabbit_data'
+    benchmark_multi_node_static(architectures, data, clients=1, iterations=30000, nodes=1)
