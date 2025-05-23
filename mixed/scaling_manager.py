@@ -28,7 +28,7 @@ class ServerScalingManager:
 
     def add_insult(self, insult):
         """Send an insult to the insult_queue"""
-        self.channel.queue_declare(queue='insult_queue', durable=True)
+        self.channel.queue_declare(queue='insult_queue', durable=False)
         self.channel.basic_publish(
             exchange='',
             routing_key='insult_queue',
@@ -38,7 +38,7 @@ class ServerScalingManager:
 
     def append_text_filtering_work_queue(self, text):
         """Send text to be filtered to text_work_queue"""
-        self.channel.queue_declare(queue='text_work_queue')
+        self.channel.queue_declare(queue='text_work_queue', durable=False)
         self.channel.basic_publish(
             exchange='',
             routing_key='text_work_queue',
@@ -50,7 +50,7 @@ class ServerScalingManager:
         """Returns the number of messages in a queue"""
         response = self.channel.queue_declare(
             queue=queue_name,
-            durable=True,
+            durable=False,
             passive=True  # Only check if queue exists
         )
         return response.method.message_count
@@ -63,7 +63,9 @@ class ServerScalingManager:
             print(f"[{label}] Messages in queue: {queue_len}")
 
             arrival_rate = queue_len / check_interval
-            needed_workers = math.ceil(arrival_rate * time_per_message / worker_capacity)
+            multiplier = 25
+            needed_workers = arrival_rate * time_per_message / worker_capacity
+            needed_workers = math.ceil(needed_workers * multiplier)
 
             current_workers = len(process_list)
             print(
@@ -72,15 +74,15 @@ class ServerScalingManager:
             # Scale up
             while len(process_list) < needed_workers:
                 p = multiprocessing.Process(target=server_target)
-                p.start()
                 process_list.append(p)
+                p.start()
                 print(f"Started new {label} server, total: {len(process_list)}")
 
             # Scale down
             while len(process_list) > needed_workers > 0:
                 p = process_list.pop()
                 p.terminate()
-                p.join(timeout=0.5)
+                p.join()
                 print(f"Stopped a {label} server, remaining: {len(process_list)}")
 
     def monitor_insult_requests(self):
