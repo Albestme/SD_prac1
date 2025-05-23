@@ -10,6 +10,7 @@ from mixed.insult_filter import start_insult_filter as filter_server
 
 def calculate_needed_servers(arrival_rate, time_per_message, capacity):
     """Calculate the number of servers needed based on the number of insults"""
+    print(f"{arrival_rate * time_per_message / capacity:.2f}")
     return math.ceil(arrival_rate * time_per_message / capacity)
 
 
@@ -21,8 +22,14 @@ class ServerScalingManager:
         self.counter_insult = 0
         self.counter_filter = 0
 
-        multiprocessing.Process(target=insult_server).start()
-        multiprocessing.Process(target=filter_server).start()
+        self.insult_processes = []
+        self.filter_processes = []
+        self.insult_processes.append(multiprocessing.Process(target=insult_server))
+        self.insult_processes[-1].start()
+        self.filter_processes.append(multiprocessing.Process(target=filter_server))
+        self.filter_processes[-1].start()
+        multiprocessing.Process(target=self.monitor_insult_requests).start()
+        multiprocessing.Process(target=self.monitor_filter_requests).start()
 
 
     def add_insult(self, insult):
@@ -34,7 +41,6 @@ class ServerScalingManager:
             body=insult.encode(),
         )
         self.counter_insult += 1
-        print(f"Submitted insult to queue {self.counter_insult}")
 
     def append_text_filtering_work_queue(self, text):
         """Send text to be filtered to text_work_queue"""
@@ -46,134 +52,62 @@ class ServerScalingManager:
         )
         self.counter_filter += 1
 
-    def get_insult_request_count(self):
-        corr_id = str(uuid.uuid4())
-        callback_queue = self.channel.queue_declare(queue='').method.queue
-
-        # Prepare to collect responses
-        responses = []
-        def on_response(ch, method, props, body):
-            if props.correlation_id == corr_id:
-                responses.append(int(body))
-
-        self.channel.basic_consume(queue=callback_queue, on_message_callback=on_response, auto_ack=True)
-
-        # Send the broadcast
-        print("Broadcasting request for request count...")
-        self.channel.basic_publish(
-            exchange='request_count_exchange',
-            routing_key='',  # Fanout ignores routing key
-            body='get_request_count',
-            properties=pika.BasicProperties(
-                reply_to=callback_queue,
-                correlation_id=corr_id
-            )
+    def get_queue_length(self, queue_name):
+        """Returns the number of messages in a queue"""
+        response = self.channel.queue_declare(
+            queue=queue_name,
+            durable=True,
+            passive=True  # Only check if queue exists
         )
+        return response.method.message_count
 
-        # Wait until we've received some responses (or timeout after N seconds)
-        timeout = 5
-        start_time = time.time()
-        while len(responses) == 0 and time.time() - start_time < timeout:
-            self.connection.process_data_events()
+    def monitor_queue(self, queue_name, process_list, server_target, worker_capacity, time_per_message, label):
+        check_interval = 1
+        while True:
+            sleep(check_interval)
+            queue_len = self.get_queue_length(queue_name)
+            print(f"[{label}] Messages in queue: {queue_len}")
 
-        return sum(responses)
+            arrival_rate = queue_len / check_interval
+            needed_workers = math.ceil(arrival_rate * time_per_message / worker_capacity)
 
-    def get_filter_filtered_count(self):
-        corr_id = str(uuid.uuid4())
-        callback_queue = self.channel.queue_declare(queue='', exclusive=True).method.queue
-        responses = []
+            current_workers = len(process_list)
+            print(
+                f'[{label}] Current workers: {current_workers} | Arrival rate: {arrival_rate:.2f} | Needed: {needed_workers}')
 
-        def on_response(ch, method, props, body):
-            if props.correlation_id == corr_id:
-                responses.append(int(body))
+            # Scale up
+            while len(process_list) < needed_workers:
+                p = multiprocessing.Process(target=server_target)
+                p.start()
+                process_list.append(p)
+                print(f"Started new {label} server, total: {len(process_list)}")
 
-        self.channel.basic_consume(queue=callback_queue, on_message_callback=on_response, auto_ack=True)
-
-        # Send the broadcast
-        self.channel.basic_publish(
-            exchange='filter_request_exchange',
-            routing_key='',  # Fanout ignores routing key
-            body='get_filtered_count',
-            properties=pika.BasicProperties(
-                reply_to=callback_queue,
-                correlation_id=corr_id
-            )
-        )
-
-        # Wait for responses (with timeout)
-        timeout = 5
-        start_time = time.time()
-        while len(responses) == 0 and time.time() - start_time < timeout:
-            self.connection.process_data_events()
-
-        total = sum(responses)
-        return total
+            # Scale down
+            while len(process_list) > needed_workers > 0:
+                p = process_list.pop()
+                p.terminate()
+                p.join(timeout=0.5)
+                print(f"Stopped a {label} server, remaining: {len(process_list)}")
 
     def monitor_insult_requests(self):
-        """Monitor the number of insults sent to add/remove workers"""
-        workers = 0
-        servers = []
-        check_interval = 1
-        server_capacity = 1497.6786     # based on the single node benchmarks
-        time_per_message = 0.000667
-        previous_requests = 0
-        while True:
-            sleep(check_interval)
-            requests = self.monitor_insult_requests()
-            requests -= previous_requests
-            previous_requests += requests
-            arrival_rate = requests / server_capacity
-            needed_workers = calculate_needed_servers(arrival_rate=arrival_rate, time_per_message=time_per_message,
-                                                      capacity=server_capacity)
-            if needed_workers > workers:
-                increment = needed_workers - workers
-                workers += increment
-                print(f'incrementing to {workers} insult workers')
-                for i in range(increment):
-                    servers.append(multiprocessing.Process(target=insult_server))
-                    servers[-1].start()
-            elif needed_workers < workers:
-                decrement = workers - needed_workers
-                workers -= decrement
-                print(f'decrementing to {workers} insult workers')
-                for i in range(decrement):
-                    servers[-1].terminate()
-                    servers.pop(-1)
-
+        self.monitor_queue(
+            queue_name='insult_queue',
+            process_list=self.insult_processes,
+            server_target=insult_server,
+            worker_capacity=1497.6786,
+            time_per_message=0.000667,
+            label="Insult"
+        )
 
     def monitor_filter_requests(self):
-        """Monitor the number of insults sent to add/remove workers"""
-        workers = 0
-        servers = []
-        check_interval = 1
-        server_capacity = 1588.65699  # based on the single node benchmarks
-        time_per_message = 0.000629
-        previous_requests = 0
-        while True:
-            sleep(check_interval)
-            requests = self.monitor_filter_requests()
-            requests -= previous_requests
-            previous_requests += requests
-            arrival_rate = requests / server_capacity
-            needed_workers = calculate_needed_servers(arrival_rate=arrival_rate, time_per_message=time_per_message,
-                                                      capacity=server_capacity)
-            if needed_workers > workers:
-                increment = needed_workers - workers
-                workers += increment
-                print(f'incrementing to {workers} filter workers')
-                for i in range(increment):
-                    servers.append(multiprocessing.Process(target=filter_server))
-                    servers[-1].start()
-
-
-            elif needed_workers < workers:
-                decrement = workers - needed_workers
-                workers -= decrement
-                print(f'decrementing to {workers} filter workers')
-                for i in range(decrement):
-                    servers[-1].terminate()
-                    servers.pop(-1)
-
+        self.monitor_queue(
+            queue_name='text_work_queue',
+            process_list=self.filter_processes,
+            server_target=filter_server,
+            worker_capacity=1588.65699,
+            time_per_message=0.000629,
+            label="Filter"
+        )
     def close(self):
         """Close connection when done"""
         self.connection.close()

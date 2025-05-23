@@ -18,7 +18,7 @@ class InsultService:
 
         # Queue for receiving insults (direct queue)
         self.insult_queue = 'insult_queue'
-        self.channel.queue_declare(queue=self.insult_queue, durable=True)
+        self.channel.queue_declare(queue=self.insult_queue)
 
         # New: For request count broadcast
         self.channel.exchange_declare(exchange='request_count_exchange', exchange_type='fanout')
@@ -37,7 +37,6 @@ class InsultService:
         print("InsultService waiting for insults...")
 
         threading.Thread(target=self._listen_for_insults, daemon=True).start()
-        threading.Thread(target=self._listen_for_request_count, daemon=True).start()
         multiprocessing.Process(target=self._broadcast_random_insult, daemon=True).start()
 
     def get_insults(self):
@@ -56,23 +55,6 @@ class InsultService:
         multiprocessing.Process(target=start_subscriber, args=(subscriber_id,)).start()
         self.subscribers.append(subscriber_id)
         print(f"Subscriber {subscriber_id} registered.")
-
-    def _listen_for_request_count(self):
-        connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
-        channel = connection.channel()
-        def callback(ch, method, properties, body):
-            if body.decode() == 'get_request_count':
-                ch.basic_publish(
-                    exchange='',
-                    routing_key=properties.reply_to,
-                    properties=pika.BasicProperties(correlation_id=properties.correlation_id),
-                    body=str(self.requests)
-                )
-            ch.basic_ack(delivery_tag=method.delivery_tag)
-
-        channel.basic_consume(queue=self.private_queue, on_message_callback=callback, auto_ack=False)
-        print("Listening for request count queries...")
-        channel.start_consuming()
 
     def _broadcast_random_insult(self):
         """Periodically broadcast random insults"""
@@ -95,7 +77,6 @@ class InsultService:
 
         def callback(ch, method, properties, body):
             insult = body.decode()
-            print(f"Received insult {self.requests}")
             self.requests += 1
             if insult not in self.insults:
                 self.add_insult(insult)
