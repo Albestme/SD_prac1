@@ -11,7 +11,7 @@ class MixedClient:
 
     def add_insult(self, insult):
         """Send an insult to the insult_queue"""
-        self.channel.queue_declare(queue='insult_queue', durable=True)
+        self.channel.queue_declare(queue='insult_queue', durable=False)
         self.channel.basic_publish(
             exchange='',
             routing_key='insult_queue',

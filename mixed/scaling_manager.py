@@ -8,12 +8,6 @@ from mixed.insult_service import start_insult_server as insult_server
 from mixed.insult_filter import start_insult_filter as filter_server
 
 
-def calculate_needed_servers(arrival_rate, time_per_message, capacity):
-    """Calculate the number of servers needed based on the number of insults"""
-    print(f"{arrival_rate * time_per_message / capacity:.2f}")
-    return math.ceil(arrival_rate * time_per_message / capacity)
-
-
 class ServerScalingManager:
     def __init__(self):
         self.connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))

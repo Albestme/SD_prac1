@@ -18,7 +18,7 @@ class InsultService:
 
         # Queue for receiving insults (direct queue)
         self.insult_queue = 'insult_queue'
-        self.channel.queue_declare(queue=self.insult_queue)
+        self.channel.queue_declare(queue=self.insult_queue, durable=False)
 
         # New: For request count broadcast
         self.channel.exchange_declare(exchange='request_count_exchange', exchange_type='fanout')
