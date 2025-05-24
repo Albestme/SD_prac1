@@ -20,7 +20,7 @@ class InsultService:
 
         threading.Thread(target=self._monitor_requests, daemon=True).start()
         threading.Thread(target=self._process_insult_queue, daemon=True).start()
-        threading.Thread(target=self._broadcast_random_insult, daemon=True).start()
+        multiprocessing.Process(target=self._broadcast_random_insult, daemon=True).start()
 
     # In a real distributed system I should request the insults to redis
     def get_insults(self):
@@ -55,7 +55,6 @@ class InsultService:
         while True:
             # Process any insults in the queue
             insult = self.client.blpop(self.insult_queue, timeout=0)
-            print(f'Processing request {self.requests}: {insult[1]}')
             self.requests += 1
             self.add_insult(insult)
 
