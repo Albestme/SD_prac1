@@ -1,3 +1,4 @@
+import threading
 import xmlrpc.client
 import Pyro4
 from Redis.redis_client import RedisClient as RedisClient
@@ -19,28 +20,36 @@ def benchmark_redis_rabbit(client, middleware, service_type, iterations, nodes, 
     if service_type == 'insult':
         for _ in range(iterations):
             client.add_insult(random.choice(insults))
-        start_time = time.time()
         for i in range(nodes):
             if middleware == 'RabbitMQ':
                 processes.append(multiprocessing.Process(target=rabbit_insult_server))
             else:
                 processes.append(multiprocessing.Process(target=redis_insult_server))
+        t = threading.Thread(target=client.wait_insult_requests_processing, args=(iterations,))
+        t.daemon = True
+        t.start()
+        start_time = time.time()
+        for i in range(nodes):
             processes[i].start()
-        client.wait_insult_requests_processing(iterations)
 
     else:
         for _ in range(iterations):
             client.append_text_filtering_work_queue(random.choice(texts))
-        start_time = time.time()
         for i in range(nodes):
             if middleware == 'RabbitMQ':
                 processes.append(multiprocessing.Process(target=rabbit_filter_server))
             else:
                 processes.append(multiprocessing.Process(target=redis_filter_server))
+        t = threading.Thread(target=client.wait_filter_requests_processing, args=(iterations,))
+        t.start()
+        start_time = time.time()
+        for i in range(nodes):
             processes[i].start()
-        client.wait_filter_requests_processing(iterations)
 
+    t.join()
     total_time = time.time() - start_time
+
+    write_csv('multiple_node_static', middleware, 1, iterations, total_time, service_type, nodes)
 
     for p in processes:
         p.terminate()
@@ -124,7 +133,8 @@ def stress_service(module_name, nodes, iterations, service_type, num_clients, mo
     end_time = time.time()
     total_time = end_time - start_time
     print(f"Total time for {num_clients} clients: {total_time:.2f}s")
-    write_csv(mode, module_name, num_clients, iterations, total_time, service_type, nodes)
+    if module_name == 'XMLRPC' or module_name == 'Pyro':
+        write_csv(mode, module_name, num_clients, iterations, total_time, service_type, nodes)
 
 
 # -------------------------------
@@ -163,23 +173,13 @@ def connect_servers(module_name, nodes):
             lb.register_filter_service(filter_proxy)
         return lb
 
-    elif module_name == 'Redis':
-        lb = LoadBalancer('Redis', 'multi_node_static')
-        lb.register_insult_service(RedisClient())
-        lb.register_filter_service(RedisClient())
-        return lb
-
-    elif module_name == 'RabbitMQ':
-        lb = LoadBalancer('RabbitMQ', 'multi_node_static')
-        return lb
-
     return None
 
 
 # -------------------------------
 # Main Entry Point
-# -------------------------------
+# -------------------------------¡
 if __name__ == '__main__':
-    architectures = ['RabbitMQ']
-    data = 'rabbit_data'
-    benchmark_multi_node_static(architectures, data, clients=1, iterations=8000, nodes=3)
+    architectures = ['Redis']
+    data = 'multiple_node_static'
+    benchmark_multi_node_static(architectures, data, clients=1, iterations=20000*10, nodes=1)
