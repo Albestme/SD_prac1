@@ -44,7 +44,7 @@ class InsultService:
     def _monitor_requests(self):
         logged_requests = 0
         while True:
-            sleep(0.1)
+            sleep(0.4)
             requests = self.requests
             if not logged_requests == requests:
                 self.client.incrby(self.requests_key, requests-logged_requests)

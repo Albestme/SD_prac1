@@ -10,29 +10,19 @@ class FilterService:
     def __init__(self, insult_service_number=''):
         self.filtered_texts = []
         self.work_queue = []
-        self.insult_service = None
-        print(self.connect_to_insult_service(insult_service_number))
+        self.request_counter = 0
+        self.insults = ['dumb', 'moron', 'stupid', 'idiot', 'groomer', 'acrotomophile', 'air head', 'accident']
 
         # Start worker thread to process the queue
         self.worker_thread = threading.Thread(target=self._process_queue)
         self.worker_thread.daemon = True
         self.worker_thread.start()
 
-    def connect_to_insult_service(self, number=''):
-        # Connect to InsultService via the name server
-        ns = Pyro4.locateNS()
-        uri = ns.lookup(f"insult.service{number}")
-        self.insult_service = Pyro4.Proxy(uri)
-        return "Connected to insult service"
 
     def filter_text(self, text):
         """Replace insults in text with CENSORED"""
-        if not self.insult_service:
-            self.connect_to_insult_service()
-
         filtered = text
-        insults = self.insult_service.get_insults()
-        for insult in insults:
+        for insult in self.insults:
             filtered = filtered.replace(insult, "CENSORED")
         return filtered
 
@@ -45,6 +35,10 @@ class FilterService:
         """Return all filtered texts"""
         return self.filtered_texts
 
+    def get_processed_requests(self):
+        """Return the number of processed requests"""
+        return self.request_counter
+
     def _process_queue(self):
         """Worker that processes the queue in background"""
         while True:
@@ -54,7 +48,7 @@ class FilterService:
                 filtered = self.filter_text(text)
                 self.filtered_texts.append(filtered)
                 print(f"Filtered: '{text}' → '{filtered}'")
-            sleep(5)  # Check for new work every 5 seconds
+            sleep(0.01)
 
 
 if __name__ == "__main__":

@@ -21,7 +21,6 @@ class RabbitMQClient:
             body=insult.encode(),
         )
         self.counter_insult += 1
-        print(f"Submitted insult to queue {self.counter_insult}")
 
     def append_text_filtering_work_queue(self, text):
         """Send text to be filtered to text_work_queue"""
@@ -46,7 +45,6 @@ class RabbitMQClient:
         self.channel.basic_consume(queue=callback_queue, on_message_callback=on_response, auto_ack=True)
 
         # Send the broadcast
-        print("Broadcasting request for request count...")
         self.channel.basic_publish(
             exchange='request_count_exchange',
             routing_key='',  # Fanout ignores routing key

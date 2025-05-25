@@ -57,7 +57,7 @@ if __name__ == '__main__':
     # Example usage:
     # Replace 'your_file.csv' with the actual path to your CSV file.
     # For example, if your file is 'Benchmarks/single_node_stress.csv'
-    csv_input_file = '../Benchmarks/single_node_stress.csv'
+    csv_input_file = './Benchmarks/single_node_stress.csv'
     # You can also specify a path to save the image, e.g., 'performance_graph.png'
     # output_file = 'performance_graph_inverted.png'
     # create_performance_graph(csv_input_file, output_file)

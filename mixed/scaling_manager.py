@@ -63,7 +63,7 @@ class ServerScalingManager:
             print(f"[{label}] Messages in queue: {queue_len}")
 
             arrival_rate = queue_len / check_interval
-            multiplier = 25
+            multiplier = 1
             needed_workers = arrival_rate * time_per_message / worker_capacity
             needed_workers = math.ceil(needed_workers * multiplier)
 
@@ -90,8 +90,8 @@ class ServerScalingManager:
             queue_name='insult_queue',
             process_list=self.insult_processes,
             server_target=insult_server,
-            worker_capacity=1497.6786,
-            time_per_message=0.000667,
+            worker_capacity=5136.10683,
+            time_per_message=0.051361,
             label="Insult"
         )
 
@@ -100,8 +100,8 @@ class ServerScalingManager:
             queue_name='text_work_queue',
             process_list=self.filter_processes,
             server_target=filter_server,
-            worker_capacity=1588.65699,
-            time_per_message=0.000629,
+            worker_capacity=4890.64517,
+            time_per_message=0.048906,
             label="Filter"
         )
     def close(self):

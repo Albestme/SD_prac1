@@ -8,7 +8,6 @@ import sys
 Pyro4.config.REQUIRE_EXPOSE = True
 
 @Pyro4.expose
-@Pyro4.behavior(instance_mode="single")
 class InsultService:
     def __init__(self):
         self.insults = []

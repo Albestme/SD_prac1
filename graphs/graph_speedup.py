@@ -171,8 +171,8 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
     files_to_process = [
-        os.path.join(script_dir, '../Benchmarks/xmlrpc_data.csv'),
-        os.path.join(script_dir, '../Benchmarks/pyro_data.csv')
+        os.path.join(script_dir, '../Benchmarks/multiple_node_static.csv'),
+
     ]
 
     all_plot_data = []

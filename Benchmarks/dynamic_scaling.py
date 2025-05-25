@@ -2,6 +2,7 @@ import multiprocessing
 import random
 from mixed.mixed_client import MixedClient as Client
 from mixed.scaling_manager import ServerScalingManager as ServerManager
+from time import sleep
 
 
 texts = [
@@ -36,11 +37,12 @@ def fill_queue(iterations):
 def process_queue():
     server_manager = multiprocessing.Process(target=ServerManager)
     server_manager.start()
-    server_manager.join()
+    while True:
+        sleep(10)
 
 
 
 
 if __name__ == '__main__':
-    #fill_queue(500000)
+    #fill_queue(50000)
     process_queue()

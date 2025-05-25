@@ -95,7 +95,6 @@ class InsultService:
 
         def callback(ch, method, properties, body):
             insult = body.decode()
-            print(f"Received insult {self.requests}")
             self.requests += 1
             if insult not in self.insults:
                 self.add_insult(insult)

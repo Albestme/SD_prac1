@@ -1,3 +1,4 @@
+
 class LoadBalancer:
     def __init__(self, architecture, test_type):
         self.architecture = architecture

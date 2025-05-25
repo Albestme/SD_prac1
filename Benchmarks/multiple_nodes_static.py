@@ -44,9 +44,44 @@ def benchmark_redis_rabbit(client, middleware, service_type, iterations, nodes, 
         t.start()
         start_time = time.time()
         for i in range(nodes):
-            processes[i].start()
+           processes[i].start()
 
     t.join()
+    total_time = time.time() - start_time
+
+    write_csv('multiple_node_static', middleware, 1, iterations, total_time, service_type, nodes)
+
+    for p in processes:
+        p.terminate()
+
+    return total_time
+
+def benchmark_redis_rabbit_2(client, middleware, service_type, iterations, nodes, texts, insults):
+    processes = []
+    if service_type == 'insult':
+        for i in range(nodes):
+            start_time = time.time()
+            if middleware == 'RabbitMQ':
+                processes.append(multiprocessing.Process(target=rabbit_insult_server))
+            else:
+                processes.append(multiprocessing.Process(target=redis_insult_server))
+        for _ in range(iterations):
+            client.add_insult(random.choice(insults))
+        for i in range(nodes):
+            processes[i].start()
+
+    else:
+        for i in range(nodes):
+            if middleware == 'RabbitMQ':
+                processes.append(multiprocessing.Process(target=rabbit_filter_server))
+            else:
+                processes.append(multiprocessing.Process(target=redis_filter_server))
+        start_time = time.time()
+        for _ in range(iterations):
+            client.append_text_filtering_work_queue(random.choice(texts))
+        for i in range(nodes):
+           processes[i].start()
+
     total_time = time.time() - start_time
 
     write_csv('multiple_node_static', middleware, 1, iterations, total_time, service_type, nodes)
@@ -180,6 +215,18 @@ def connect_servers(module_name, nodes):
 # Main Entry Point
 # -------------------------------¡
 if __name__ == '__main__':
-    architectures = ['Redis']
+    architectures = ['RabbitMQ']
     data = 'multiple_node_static'
-    benchmark_multi_node_static(architectures, data, clients=1, iterations=20000*10, nodes=1)
+    benchmark_multi_node_static(architectures, data, clients=1, iterations=30000, nodes=1)
+    texts = [
+        'JAJAJA, Im sorry, but you are dumb and stupid',
+        'I love to see a moron cry',
+        'stupid idiot I hate you',
+        'Only a groomer would say that',
+        'I love to way acrotomophile cry',
+        'Que viva España',
+        'You are an air head and an accident',
+        'I love how strawberries taste'
+    ]
+    insults = ['dumb', 'moron', 'stupid', 'idiot', 'groomer', 'acrotomophile', 'air head', 'accident']
+    #benchmark_redis_rabbit_2(RedisClient(), 'Redis', 'insult', 100000, 1, texts, insults)
